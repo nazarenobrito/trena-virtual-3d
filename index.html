@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trena Virtual - Distância e Altura</title>
+    <title>Trena Virtual - Versão Corrigida</title>
     <style>
-        /* Reset e layout ocupar 100% da tela */
         body {
             margin: 0;
             padding: 0;
@@ -14,7 +13,6 @@
             background-color: #000;
         }
 
-        /* Vídeo da câmera traseira */
         #camera-video {
             position: absolute;
             top: 0;
@@ -25,7 +23,6 @@
             z-index: 1;
         }
 
-        /* Mirante central (Crosshair) */
         #crosshair {
             position: absolute;
             top: 50%;
@@ -51,7 +48,6 @@
             border-radius: 50%;
         }
 
-        /* Painel principal de controle */
         #controls-panel {
             position: absolute;
             top: 15px;
@@ -68,7 +64,6 @@
             box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
 
-        /* Seletor de Modo (Abas) */
         .mode-selector {
             display: flex;
             justify-content: center;
@@ -92,7 +87,6 @@
             font-weight: bold;
         }
 
-        /* Estilização dos resultados */
         .result-title {
             font-size: 18px;
             font-weight: bold;
@@ -113,7 +107,6 @@
             border: 1px solid #ccc;
         }
 
-        /* Botão de ação (Capturar topo/base) */
         #action-btn {
             margin-top: 10px;
             padding: 8px 16px;
@@ -127,7 +120,6 @@
             display: none;
         }
 
-        /* Botão de início */
         #permission-btn {
             position: absolute;
             bottom: 30px;
@@ -143,6 +135,12 @@
             z-index: 10;
             cursor: pointer;
         }
+
+        .error-message {
+            color: #ff4d4d;
+            font-size: 13px;
+            margin-top: 6px;
+        }
     </style>
 </head>
 <body>
@@ -151,7 +149,6 @@
     <div id="crosshair"></div>
 
     <div id="controls-panel">
-        <!-- Seletor de Modo -->
         <div class="mode-selector">
             <button class="mode-btn active" id="btn-mode-dist" onclick="switchMode('dist')">Distância</button>
             <button class="mode-btn" id="btn-mode-height" onclick="switchMode('height')">Altura</button>
@@ -159,9 +156,10 @@
 
         <div id="result-display" class="result-title">Distância: -- m</div>
         <div id="sub-info" style="font-size: 12px; color: #aaa;">Inclinação: --°</div>
+        <div id="error-display" class="error-message"></div>
         
         <div class="input-group">
-            <label for="user-height">Sua altura do celular (m): </label>
+            <label for="user-height">Altura do celular (m): </label>
             <input type="number" id="user-height" value="1.50" step="0.05" min="0.5" max="2.5">
         </div>
 
@@ -171,26 +169,30 @@
     <button id="permission-btn">Ativar Sensores e Câmera</button>
 
     <script>
-        // --- DOCUMENTAÇÃO DAS VARIÁVEIS GLOBAIS ---
+        // --- 1. REFERÊNCIAS VISUAIS DA INTERFACE ---
         const videoElement = document.getElementById('camera-video');
         const resultDisplay = document.getElementById('result-display');
         const subInfo = document.getElementById('sub-info');
+        const errorDisplay = document.getElementById('error-display');
         const userHeightInput = document.getElementById('user-height');
         const permissionBtn = document.getElementById('permission-btn');
         const actionBtn = document.getElementById('action-btn');
 
-        let currentMode = 'dist'; // 'dist' ou 'height'
-        let heightStep = 1;       // 1: Capturar Base, 2: Capturar Topo
+        // Variáveis de Estado
+        let currentMode = 'dist';
+        let heightStep = 1;
         let currentPitchDegrees = 0;
-        
-        // Memória para o cálculo da altura
         let storedDistanceMeters = 0;
 
-        // --- PASSO 1: ATIVAÇÃO DE SENSORES E CÂMERA ---
+        // --- 2. TRATAMENTO DE PERMISSÕES E CÂMERA ---
         permissionBtn.addEventListener('click', async () => {
-            await startCamera();
-            await requestOrientationPermission();
-            permissionBtn.style.display = 'none';
+            errorDisplay.innerText = "";
+            const camOk = await startCamera();
+            const sensorOk = await requestOrientationPermission();
+            
+            if (camOk && sensorOk) {
+                permissionBtn.style.display = 'none';
+            }
         });
 
         async function startCamera() {
@@ -199,8 +201,10 @@
                     video: { facingMode: 'environment' }
                 });
                 videoElement.srcObject = stream;
+                return true;
             } catch (err) {
-                alert("Erro ao acessar a câmera: " + err.message);
+                errorDisplay.innerText = "Câmera não permitida ou indisponível.";
+                return false;
             }
         }
 
@@ -210,14 +214,22 @@
                     const response = await DeviceOrientationEvent.requestPermission();
                     if (response === 'granted') {
                         window.addEventListener('deviceorientation', handleOrientation);
+                        return true;
+                    } else {
+                        errorDisplay.innerText = "Permissão ao giroscópio negada.";
+                        return false;
                     }
-                } catch (e) { console.error(e); }
+                } catch (e) {
+                    errorDisplay.innerText = "Erro ao solicitar sensores.";
+                    return false;
+                }
             } else {
                 window.addEventListener('deviceorientation', handleOrientation);
+                return true;
             }
         }
 
-        // --- PASSO 2: LEITURA DO GIROSCÓPIO ---
+        // --- 3. CAPTURA E NORMALIZAÇÃO DO GIROSCÓPIO ---
         function handleOrientation(event) {
             if (event.beta !== null) {
                 currentPitchDegrees = event.beta;
@@ -225,7 +237,7 @@
             }
         }
 
-        // --- PASSO 3: GERENCIAMENTO DE MODOS E CÁLCULOS ---
+        // --- 4. TROCA DE MODO E RESET DA INTERFACE ---
         function switchMode(mode) {
             currentMode = mode;
             document.getElementById('btn-mode-dist').classList.toggle('active', mode === 'dist');
@@ -235,44 +247,57 @@
                 actionBtn.style.display = 'none';
                 updateCalculations();
             } else {
-                heightStep = 1;
-                actionBtn.style.display = 'inline-block';
-                actionBtn.innerText = "1º Passo: Fixar Base (Chão)";
-                resultDisplay.innerText = "Mire na BASE do objeto";
-                subInfo.innerText = "Aperte o botão para fixar a distância";
+                resetHeightState();
             }
         }
 
+        // Função de Reset Explícita para evitar textos presos na tela
+        function resetHeightState() {
+            heightStep = 1;
+            actionBtn.style.display = 'inline-block';
+            actionBtn.innerText = "1º Passo: Fixar Base (Chão)";
+            actionBtn.style.backgroundColor = "#28a745";
+            actionBtn.style.color = "#fff";
+            resultDisplay.innerText = "Mire na BASE do objeto";
+            subInfo.innerText = "Aperte o botão para fixar a distância";
+        }
+
+        // --- 5. LÓGICA TRIGONOMÉTRICA REVISADA ---
         function getHorizontalDistance() {
-            const h = parseFloat(userHeightInput.value) || 1.50;
+            const eyeHeight = parseFloat(userHeightInput.value) || 1.50;
+            
+            // Ângulo de inclinação com a horizontal (90° = vertical / 0° = horizontal)
             let angleFromHorizontal = 90 - currentPitchDegrees;
 
-            if (angleFromHorizontal <= 1 || angleFromHorizontal >= 89) return null;
+            // Filtro de segurança (Clamp flexibilizado usando Math.abs)
+            if (angleFromHorizontal <= 2 || angleFromHorizontal >= 88) {
+                return null;
+            }
 
             const angleRadians = angleFromHorizontal * (Math.PI / 180);
-            return h / Math.tan(angleRadians);
+            return eyeHeight / Math.tan(angleRadians);
         }
 
         function updateCalculations() {
             if (currentMode === 'dist') {
                 const d = getHorizontalDistance();
                 if (d === null) {
-                    resultDisplay.innerText = "Distância: --";
+                    resultDisplay.innerText = "Mire mais para o chão";
                     subInfo.innerText = `Inclinação: ${currentPitchDegrees.toFixed(1)}°`;
                 } else {
                     resultDisplay.innerText = `Distância: ${d.toFixed(2)} m`;
                     subInfo.innerText = `Inclinação: ${currentPitchDegrees.toFixed(1)}° | ${(d * 100).toFixed(0)} cm`;
                 }
             } else if (currentMode === 'height' && heightStep === 2) {
-                // Cálculo da Altura durante a Etapa 2 (Apontando para o topo)
                 const eyeHeight = parseFloat(userHeightInput.value) || 1.50;
                 
-                // Ângulo de elevação acima ou abaixo da linha dos olhos (horizonte = 90° pitch)
+                // Elevação em relação à linha do horizonte (90° pitch)
+                // Se pitch < 90° (inclinado para cima), elevationAngle é positivo!
                 let elevationAngleDegrees = 90 - currentPitchDegrees;
                 let elevationRadians = elevationAngleDegrees * (Math.PI / 180);
-                
-                // Fórmula da Altura: H = h_olhos + (distância_horizontal * tan(ângulo_elevação))
-                let calculatedObjectHeight = eyeHeight - (storedDistanceMeters * Math.tan(elevationRadians));
+
+                // FÓRMULA CORRIGIDA: H = AlturaOlho + (Distância * tan(ÂnguloElevação))
+                let calculatedObjectHeight = eyeHeight + (storedDistanceMeters * Math.tan(elevationRadians));
 
                 if (calculatedObjectHeight < 0) calculatedObjectHeight = 0;
 
@@ -281,10 +306,9 @@
             }
         }
 
-        // --- PASSO 4: FLUXO DE MEDIÇÃO DA ALTURA ---
+        // --- 6. FLUXO DE MEDIÇÃO DE ALTURA (AÇÕES DO BOTÃO) ---
         function handleAction() {
             if (heightStep === 1) {
-                // Fixa a base
                 const d = getHorizontalDistance();
                 if (d === null) {
                     alert("Apunte para o chão para fixar a base corretamente.");
@@ -296,14 +320,10 @@
                 actionBtn.style.backgroundColor = "#ffc107";
                 actionBtn.style.color = "#000";
                 resultDisplay.innerText = "Mire no TOPO do objeto";
-                subInfo.innerText = `Base salva: ${d.toFixed(2)}m. Agora incline para cima!`;
+                subInfo.innerText = `Base salva: ${d.toFixed(2)}m. Incline para cima!`;
             } else {
-                // Reseta para nova medição de altura
-                heightStep = 1;
-                actionBtn.innerText = "1º Passo: Fixar Base (Chão)";
-                actionBtn.style.backgroundColor = "#28a745";
-                actionBtn.style.color = "#fff";
-                updateCalculations();
+                // Ao clicar novamente na etapa 2, resetamos perfeitamente o estado
+                resetHeightState();
             }
         }
 
