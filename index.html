@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trena Virtual 3D - WebXR</title>
+    <style>
+        /* Estilização básica para ocupar toda a tela do celular */
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background-color: #000;
+        }
+
+        /* Painel superior de informações */
+        #info-panel {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            z-index: 10;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        /* Botão para iniciar a sessão de Realidade Aumentada */
+        #ar-button {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 14px 28px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #fff;
+            background-color: #007bff;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            z-index: 10;
+        }
+    </style>
+
+    <!-- Importação do Three.js para renderização 3D -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <div id="info-panel">Aproxime o celular e toque na tela para marcar pontos</div>
+    <button id="ar-button">Iniciar AR</button>
+
+    <script>
+        // --- ETAPA 1: Variáveis Globais de Controle ---
+        let container;
+        let camera, scene, renderer;
+        let controller;
+        let reticle; // Ponto de mira que detecta superfícies
+        let hitTestSource = null;
+        let hitTestSourceRequested = false;
+
+        // Armazenamento dos pontos marcados
+        const points = [];
+        let currentLine = null;
+
+        init();
+
+        // --- ETAPA 2: Inicialização da Cena e WebXR ---
+        function init() {
+            // Criando o container principal
+            container = document.createElement('div');
+            document.body.appendChild(container);
+
+            // Criando a Cena 3D
+            scene = new THREE.Scene();
+
+            // Criando a Câmera 3D
+            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+
+            // Adicionando iluminação à cena
+            const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+            light.position.set(0.5, 1, 0.75);
+            scene.add(light);
+
+            // Configurando o Renderizador WebGL com suporte a WebXR
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.xr.enabled = true; // Ativa capacidade de AR
+            container.appendChild(renderer.domElement);
+
+            // Configuração do Retículo (Mira no chão/parede)
+            reticle = new THREE.Mesh(
+                new THREE.RingGeometry(0.04, 0.05, 32).rotateX(-Math.PI / 2),
+                new THREE.MeshBasicMaterial({ color: 0x00ff00 })
+            );
+            reticle.matrixAutoUpdate = false;
+            reticle.visible = false;
+            scene.add(reticle);
+
+            // Configuração do Botão AR nativo
+            document.getElementById('ar-button').addEventListener('click', onRequestSession);
+
+            // Ajusta o tamanho da tela ao redimensionar a janela
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        // --- ETAPA 3: Gerenciamento da Sessão AR ---
+        async function onRequestSession() {
+            if (navigator.xr) {
+                try {
+                    const session = await navigator.xr.requestSession('immersive-ar', {
+                        requiredFeatures: ['hit-test']
+                    });
+                    onSessionStarted(session);
+                } catch (e) {
+                    alert('WebXR AR não suportado neste navegador/dispositivo.');
+                }
+            } else {
+                alert('API WebXR não encontrada neste navegador.');
+            }
+        }
+
+        function onSessionStarted(session) {
+            renderer.xr.setSession(session);
+            document.getElementById('ar-button').style.display = 'none';
+
+            // Adiciona evento de clique/toque na tela do celular
+            controller = renderer.xr.getController(0);
+            controller.addEventListener('select', onSelect);
+            scene.add(controller);
+
+            // Loop de animação contínuo
+            renderer.setAnimationLoop(render);
+        }
+
+        // --- ETAPA 4: Lógica de Marcação e Cálculo de Distância ---
+        function onSelect() {
+            if (reticle.visible) {
+                // Obtém a posição 3D exata onde o retículo está apontando
+                const position = new THREE.Vector3();
+                position.setFromMatrixPosition(reticle.matrix);
+
+                // Adiciona um pequeno marcador visual (esfera vermelha) no ponto tocado
+                const markerGeo = new THREE.SphereGeometry(0.015, 16, 16);
+                const markerMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+                const marker = new THREE.Mesh(markerGeo, markerMat);
+                marker.position.copy(position);
+                scene.add(marker);
+
+                points.push(position);
+
+                // Se já temos pelo menos 2 pontos, desenhamos a linha e calculamos a distância
+                if (points.length >= 2) {
+                    const p1 = points[points.length - 2];
+                    const p2 = points[points.length - 1];
+
+                    // Desenha a linha entre os dois últimos pontos
+                    const lineGeo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+                    const lineMat = new THREE.LineBasicMaterial({ color: 0x00ffff, linewidth: 3 });
+                    const line = new THREE.Line(lineGeo, lineMat);
+                    scene.add(line);
+
+                    // Calcula a distância euclidiana em metros
+                    const distanceMeters = p1.distanceTo(p2);
+                    const distanceCM = (distanceMeters * 100).toFixed(1);
+
+                    // Atualiza a interface do usuário
+                    document.getElementById('info-panel').innerText = `Distância: ${distanceCM} cm (${distanceMeters.toFixed(2)} m)`;
+                }
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // --- ETAPA 5: Loop de Renderização e Teste de Impacto (Hit Test) ---
+        function render(timestamp, frame) {
+            if (frame) {
+                const referenceSpace = renderer.xr.getReferenceSpace();
+                const session = renderer.xr.getSession();
+
+                // Solicita a fonte de Hit-Test para detectar planos/superfícies no mundo real
+                if (!hitTestSourceRequested) {
+                    session.requestReferenceSpace('viewer').then((viewerSpace) => {
+                        session.requestHitTestSource({ space: viewerSpace }).then((source) => {
+                            hitTestSource = source;
+                        });
+                    });
+                    session.addEventListener('end', () => {
+                        hitTestSourceRequested = false;
+                        hitTestSource = null;
+                    });
+                    hitTestSourceRequested = true;
+                }
+
+                // Se a detecção de superfície retornar resultados, posiciona o retículo
+                if (hitTestSource) {
+                    const hitTestResults = frame.getHitTestResults(hitTestSource);
+                    if (hitTestResults.length > 0) {
+                        const hit = hitTestResults[0];
+                        const pose = hit.getPose(referenceSpace);
+
+                        reticle.visible = true;
+                        reticle.matrix.fromArray(pose.transform.matrix);
+                    } else {
+                        reticle.visible = false;
+                    }
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
