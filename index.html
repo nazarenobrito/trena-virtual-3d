@@ -3,18 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trena Virtual - Interface Limpa e Dinâmica</title>
+    <title>Trena Virtual Pro</title>
     <style>
-        /* Estilização base ocupando 100% da tela */
+        /* 1. ESTILOS BASE E LAYOUT */
         body {
             margin: 0;
             padding: 0;
             overflow: hidden;
-            font-family: Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background-color: #000;
         }
 
-        /* Vídeo da câmera traseira */
         #camera-video {
             position: absolute;
             top: 0;
@@ -25,19 +24,24 @@
             z-index: 1;
         }
 
-        /* Alvo central destacado (Crosshair) */
+        /* 2. MIRA INTELIGENTE (CROSSHAIR) */
+        :root {
+            --crosshair-color: #ff4d4d; /* Inicia vermelho até calibrar/mirar certo */
+        }
+
         #crosshair {
             position: absolute;
             top: 50%;
             left: 50%;
-            width: 24px;
-            height: 24px;
+            width: 28px;
+            height: 28px;
             transform: translate(-50%, -50%);
-            border: 2px solid #00ff00;
+            border: 2.5px solid var(--crosshair-color);
             border-radius: 50%;
             z-index: 5;
             pointer-events: none;
-            box-shadow: 0 0 4px rgba(0,0,0,0.8);
+            box-shadow: 0 0 8px rgba(0,0,0,0.6);
+            transition: border-color 0.3s ease;
         }
 
         #crosshair::after {
@@ -45,97 +49,120 @@
             position: absolute;
             top: 50%;
             left: 50%;
-            width: 4px;
-            height: 4px;
-            background: #00ff00;
+            width: 6px;
+            height: 6px;
+            background: var(--crosshair-color);
             transform: translate(-50%, -50%);
             border-radius: 50%;
+            transition: background 0.3s ease;
         }
 
-        /* Painel compacto no topo para não cobrir o centro da tela */
+        /* 3. DESIGN PREMIUM DO PAINEL (Glassmorphism) */
         #controls-panel {
             position: absolute;
-            top: 10px;
+            top: 15px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.85);
+            background: rgba(20, 20, 20, 0.75);
+            backdrop-filter: blur(12px); /* Efeito vidro fosco */
+            -webkit-backdrop-filter: blur(12px);
             color: #ffffff;
-            padding: 10px 14px;
-            border-radius: 12px;
+            padding: 12px 16px;
+            border-radius: 16px;
             font-size: 13px;
             z-index: 10;
             text-align: center;
-            width: 88%;
-            max-height: 40vh; /* Limita a altura para não cobrir o mira */
+            width: 90%;
+            max-height: 45vh;
             overflow-y: auto;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
+        /* Abas de Modo */
         .mode-selector {
             display: flex;
             justify-content: center;
             gap: 8px;
-            margin-bottom: 6px;
+            margin-bottom: 8px;
         }
 
         .mode-btn {
-            background: #333;
-            color: #fff;
-            border: 1px solid #555;
-            padding: 4px 12px;
+            background: rgba(255,255,255,0.1);
+            color: #ccc;
+            border: none;
+            padding: 6px 14px;
             border-radius: 12px;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 13px;
+            transition: all 0.2s ease;
         }
 
         .mode-btn.active {
-            background: #007bff;
-            border-color: #007bff;
+            background: #007aff;
+            color: #fff;
             font-weight: bold;
+            box-shadow: 0 2px 8px rgba(0, 122, 255, 0.5);
         }
 
+        /* Tipografia de Resultados */
         .result-title {
-            font-size: 17px;
-            font-weight: bold;
-            color: #00ff00;
+            font-size: 22px;
+            font-weight: 800;
+            color: #fff;
             margin: 4px 0;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
         }
 
         .input-group {
-            margin-top: 4px;
-            font-size: 11px;
+            margin-top: 8px;
+            font-size: 12px;
+            color: #ddd;
         }
 
         .input-group input {
             width: 50px;
-            padding: 2px;
+            padding: 4px;
             text-align: center;
-            border-radius: 4px;
-            border: 1px solid #ccc;
+            border-radius: 6px;
+            border: 1px solid #555;
+            background: rgba(0,0,0,0.5);
+            color: #fff;
+        }
+
+        /* Botões de Ação Modernos */
+        .actions-grid {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-top: 10px;
         }
 
         .btn-action {
-            margin-top: 6px;
-            padding: 6px 10px;
-            font-size: 11px;
+            padding: 8px 12px;
+            font-size: 12px;
             font-weight: bold;
             color: #fff;
             border: none;
-            border-radius: 15px;
+            border-radius: 12px;
             cursor: pointer;
+            transition: transform 0.1s, filter 0.2s;
         }
+        
+        .btn-action:active { transform: scale(0.95); } /* Efeito de clique */
 
-        #calibrate-btn { background-color: #6c757d; }
-        #action-btn { background-color: #28a745; display: none; }
-        #save-btn { background-color: #17a2b8; }
-        #toggle-history-btn { background-color: #555; }
+        #calibrate-btn { background-color: #5e5ce6; }
+        #action-btn { background-color: #34c759; display: none; }
+        #save-btn { background-color: #ff9f0a; }
+        #toggle-history-btn { background-color: #444; }
 
-        /* Histórico Retrátil (Escondido por padrão) */
+        /* Histórico Estilizado */
         #history-section {
-            display: none; /* Inicia oculto para não obstruir */
-            margin-top: 10px;
-            border-top: 1px solid #444;
-            padding-top: 8px;
+            display: none;
+            margin-top: 12px;
+            border-top: 1px solid rgba(255,255,255,0.2);
+            padding-top: 10px;
             text-align: left;
         }
 
@@ -143,38 +170,39 @@
             list-style: none;
             padding: 0;
             margin: 6px 0;
-            max-height: 100px;
+            max-height: 120px;
             overflow-y: auto;
         }
 
         #history-list li {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 4px 8px;
-            border-radius: 4px;
-            margin-bottom: 3px;
-            font-size: 11px;
+            background: rgba(255, 255, 255, 0.08);
+            padding: 6px 10px;
+            border-radius: 8px;
+            margin-bottom: 4px;
+            font-size: 12px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            border-left: 3px solid #ff9f0a;
         }
 
+        /* Botão Inicial */
         #permission-btn {
             position: absolute;
-            bottom: 30px;
+            bottom: 40px;
             left: 50%;
             transform: translateX(-50%);
-            padding: 14px 28px;
+            padding: 16px 32px;
             font-size: 16px;
             font-weight: bold;
             color: #fff;
-            background-color: #007bff;
+            background: linear-gradient(135deg, #007aff, #5e5ce6);
             border: none;
             border-radius: 30px;
             z-index: 10;
-            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 122, 255, 0.4);
         }
 
-        .error-message { color: #ff4d4d; font-size: 11px; margin-top: 2px; }
     </style>
 </head>
 <body>
@@ -188,34 +216,33 @@
             <button class="mode-btn" id="btn-mode-height" onclick="switchMode('height')">Altura</button>
         </div>
 
-        <div id="result-display" class="result-title">Distância: -- m</div>
-        <div id="sub-info" style="font-size: 11px; color: #aaa;">Elevação: --° | Zero: --°</div>
-        <div id="error-display" class="error-message"></div>
+        <div id="result-display" class="result-title">Calibre o sensor</div>
+        <div id="sub-info" style="font-size: 11px; color: #aaa;">Aguardando...</div>
+        <div id="error-display" style="color: #ff453a; font-size: 11px; margin-top: 2px;"></div>
         
         <div class="input-group">
-            <label for="user-height">Altura da Câmera (m): </label>
+            <label for="user-height">Altura do Celular (m): </label>
             <input type="number" id="user-height" value="1.50" step="0.05" min="0.5" max="2.5">
         </div>
 
-        <div style="margin-top: 6px; display: flex; justify-content: center; gap: 4px; flex-wrap: wrap;">
-            <button class="btn-action" id="calibrate-btn" onclick="calibrateHorizon()">1. Calibrar</button>
-            <button class="btn-action" id="action-btn" onclick="handleAction()">2. Fixar Base</button>
-            <button class="btn-action" id="save-btn" onclick="saveCurrentMeasurement()">Salvar</button>
+        <div class="actions-grid">
+            <button class="btn-action" id="calibrate-btn" onclick="calibrateHorizon()">🎯 Calibrar</button>
+            <button class="btn-action" id="action-btn" onclick="handleAction()">📍 Fixar Base</button>
+            <button class="btn-action" id="save-btn" onclick="saveCurrentMeasurement()">💾 Salvar</button>
             <button class="btn-action" id="toggle-history-btn" onclick="toggleHistory()">📋 Histórico</button>
         </div>
 
-        <!-- Seção de Histórico Retrátil -->
         <div id="history-section">
-            <strong style="font-size: 12px;">Histórico Guardado</strong>
+            <strong style="font-size: 12px; color: #ddd;">Medições Salvas</strong>
             <ul id="history-list"></ul>
-            <button class="btn-action" style="background: #dc3545; font-size: 10px; padding: 3px 6px;" onclick="clearHistory()">Apagar Tudo</button>
+            <button class="btn-action" style="background: #ff3b30; font-size: 10px; padding: 4px 8px;" onclick="clearHistory()">Apagar Tudo</button>
         </div>
     </div>
 
-    <button id="permission-btn">Ativar Sensores e Câmera</button>
+    <button id="permission-btn">Ativar Trena Virtual Pro</button>
 
     <script>
-        // --- 1. ELEMENTOS VISUAIS E ESTADOS ---
+        // --- 1. REFERÊNCIAS VISUAIS ---
         const videoElement = document.getElementById('camera-video');
         const resultDisplay = document.getElementById('result-display');
         const subInfo = document.getElementById('sub-info');
@@ -226,20 +253,32 @@
         const calibrateBtn = document.getElementById('calibrate-btn');
         const historySection = document.getElementById('history-section');
         const historyList = document.getElementById('history-list');
+        const rootStyles = document.documentElement;
 
+        // --- 2. VARIÁVEIS DE ESTADO E SUAVIZAÇÃO (FILTRO) ---
         let currentMode = 'dist';
         let heightStep = 1;
-        let currentPitchDegrees = 0;
-        let lastCalculatedValue = 0;
         
+        // Variáveis do Filtro Passa-Baixa
+        let smoothedPitch = null;
+        const smoothingFactor = 0.15; // 0.15 garante fluidez sem muito atraso
+        
+        let lastCalculatedValue = 0;
         let horizonBeta = 90;
         let isCalibrated = false;
         let storedDistanceMeters = 0;
-
         let savedMeasurements = JSON.parse(localStorage.getItem('trena_history') || '[]');
 
-        // --- 2. PERMISSÕES E LEITURA CONTÍNUA ---
+        // --- 3. FEEDBACK TÁTIL ---
+        function triggerHaptic() {
+            if (navigator.vibrate) {
+                navigator.vibrate(40); // Vibra por 40ms
+            }
+        }
+
+        // --- 4. INICIALIZAÇÃO ---
         permissionBtn.addEventListener('click', async () => {
+            triggerHaptic();
             errorDisplay.innerText = "";
             const camOk = await startCamera();
             const sensorOk = await requestOrientationPermission();
@@ -251,9 +290,7 @@
 
         async function startCamera() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'environment' }
-                });
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
                 videoElement.srcObject = stream;
                 return true;
             } catch (err) {
@@ -269,105 +306,117 @@
                     if (response === 'granted') {
                         window.addEventListener('deviceorientation', handleOrientation);
                         return true;
-                    } else {
-                        errorDisplay.innerText = "Giroscópio negado.";
-                        return false;
                     }
-                } catch (e) {
-                    errorDisplay.innerText = "Erro nos sensores.";
                     return false;
-                }
+                } catch (e) { return false; }
             } else {
                 window.addEventListener('deviceorientation', handleOrientation);
                 return true;
             }
         }
 
-        // Executado continuamente a cada movimento do celular
+        // --- 5. FILTRO MATEMÁTICO DO GIROSCÓPIO ---
         function handleOrientation(event) {
             if (event.beta !== null) {
-                currentPitchDegrees = event.beta;
-                updateCalculations(); // Garante atualização em tempo real
+                let rawPitch = event.beta;
+                
+                // Aplica o Filtro Passa-Baixa (Exponential Moving Average)
+                if (smoothedPitch === null) {
+                    smoothedPitch = rawPitch;
+                } else {
+                    smoothedPitch = smoothedPitch + smoothingFactor * (rawPitch - smoothedPitch);
+                }
+                
+                updateCalculations();
             }
         }
 
         function getElevationDegrees() {
-            return currentPitchDegrees - horizonBeta;
+            return smoothedPitch - horizonBeta;
         }
 
         function calibrateHorizon() {
-            horizonBeta = currentPitchDegrees;
+            triggerHaptic();
+            horizonBeta = smoothedPitch;
             isCalibrated = true;
-            calibrateBtn.style.backgroundColor = "#17a2b8";
-            calibrateBtn.innerText = "Calibrado ✓";
+            calibrateBtn.style.backgroundColor = "#34c759";
+            calibrateBtn.innerText = "✓ Calibrado";
             updateCalculations();
         }
 
-        // --- 3. CÁLCULO TRIGONOMÉTRICO DINÂMICO ---
+        // --- 6. CÁLCULO E COR DA MIRA ---
         function getBaseDistance() {
             const h = parseFloat(userHeightInput.value);
             const elevation = getElevationDegrees();
             if (!Number.isFinite(h) || h <= 0 || elevation >= -2) return null;
-            const elevationRad = elevation * (Math.PI / 180);
-            return -h / Math.tan(elevationRad);
+            return -h / Math.tan(elevation * (Math.PI / 180));
         }
 
         function getObjectHeight(distance) {
             const h = parseFloat(userHeightInput.value);
             const elevation = getElevationDegrees();
             if (!Number.isFinite(h) || h <= 0) return 0;
-            const elevationRad = elevation * (Math.PI / 180);
-            return h + (distance * Math.tan(elevationRad));
+            return h + (distance * Math.tan(elevation * (Math.PI / 180)));
         }
 
-        // --- 4. ATUALIZAÇÃO DA TELA EM TEMPO REAL ---
+        function setCrosshairColor(isValid) {
+            if (isValid) {
+                rootStyles.style.setProperty('--crosshair-color', '#32d74b'); // Verde iPhone
+            } else {
+                rootStyles.style.setProperty('--crosshair-color', '#ff453a'); // Vermelho iPhone
+            }
+        }
+
         function updateCalculations() {
             const elevation = getElevationDegrees();
-            const subText = `Elevação: ${elevation.toFixed(1)}° | Zero: ${horizonBeta.toFixed(1)}°`;
+            const subText = `Elevação: ${elevation.toFixed(1)}°`;
 
             if (currentMode === 'dist') {
                 const d = getBaseDistance();
                 if (d === null) {
-                    resultDisplay.innerText = isCalibrated ? "Mire no CHÃO" : "Calibre em frente";
+                    resultDisplay.innerText = isCalibrated ? "Aponte p/ o chão" : "Calibre o Sensor";
                     subInfo.innerText = subText;
                     lastCalculatedValue = 0;
+                    setCrosshairColor(false);
                 } else {
                     lastCalculatedValue = d;
-                    // ATUALIZAÇÃO DINÂMICA: Exibe o valor em tempo real conforme você move o celular
-                    resultDisplay.innerText = `Distância: ${d.toFixed(2)} m`;
+                    resultDisplay.innerText = `${d.toFixed(2)} m`;
+                    resultDisplay.style.color = "#32d74b";
                     subInfo.innerText = `${subText} | ${(d * 100).toFixed(0)} cm`;
+                    setCrosshairColor(true);
                 }
             } else if (currentMode === 'height' && heightStep === 2) {
                 const totalHeight = getObjectHeight(storedDistanceMeters);
                 lastCalculatedValue = totalHeight;
-                resultDisplay.innerText = `Altura: ${totalHeight.toFixed(2)} m`;
-                subInfo.innerText = `Dist. Base: ${storedDistanceMeters.toFixed(2)}m | ${subText}`;
+                resultDisplay.innerText = `${totalHeight.toFixed(2)} m`;
+                resultDisplay.style.color = "#0a84ff"; // Azul
+                subInfo.innerText = `Base: ${storedDistanceMeters.toFixed(2)}m | ${subText}`;
+                setCrosshairColor(true);
             }
         }
 
-        // --- 5. HISTÓRICO RETRÁTIL E SALVAMENTO ---
+        // --- 7. HISTÓRICO E MÁQUINA DE ESTADOS ---
         function toggleHistory() {
+            triggerHaptic();
             const isHidden = historySection.style.display === 'none' || historySection.style.display === '';
             historySection.style.display = isHidden ? 'block' : 'none';
         }
 
         function saveCurrentMeasurement() {
+            triggerHaptic();
             if (lastCalculatedValue <= 0) {
-                alert("Nenhuma medição válida no momento para salvar.");
+                alert("Mire corretamente antes de salvar.");
                 return;
             }
-
             const label = prompt("Nome da medição:", currentMode === 'dist' ? "Distância" : "Altura");
             if (label === null) return;
 
-            const item = {
+            savedMeasurements.push({
                 id: Date.now(),
                 label: label || (currentMode === 'dist' ? "Distância" : "Altura"),
                 type: currentMode === 'dist' ? "Distância" : "Altura",
                 value: lastCalculatedValue.toFixed(2)
-            };
-
-            savedMeasurements.push(item);
+            });
             localStorage.setItem('trena_history', JSON.stringify(savedMeasurements));
             renderHistory();
         }
@@ -375,19 +424,19 @@
         function renderHistory() {
             historyList.innerHTML = "";
             if (savedMeasurements.length === 0) {
-                historyList.innerHTML = "<li style='color: #aaa;'>Nenhum registro.</li>";
+                historyList.innerHTML = "<li style='color: #888;'>Nenhum registro.</li>";
                 return;
             }
-
             savedMeasurements.forEach(item => {
                 const li = document.createElement('li');
                 li.innerHTML = `<span><strong>${item.label}:</strong> ${item.value} m</span>
-                                <button onclick="deleteHistoryItem(${item.id})" style="background:none; border:none; color:#ff4d4d; cursor:pointer;">✕</button>`;
+                                <button onclick="deleteHistoryItem(${item.id})" style="background:none; border:none; color:#ff453a; cursor:pointer; font-size:14px;">✕</button>`;
                 historyList.appendChild(li);
             });
         }
 
         function deleteHistoryItem(id) {
+            triggerHaptic();
             savedMeasurements = savedMeasurements.filter(item => item.id !== id);
             localStorage.setItem('trena_history', JSON.stringify(savedMeasurements));
             renderHistory();
@@ -401,14 +450,15 @@
             }
         }
 
-        // --- 6. TROCA DE MODO ---
         function switchMode(mode) {
+            triggerHaptic();
             currentMode = mode;
             document.getElementById('btn-mode-dist').classList.toggle('active', mode === 'dist');
             document.getElementById('btn-mode-height').classList.toggle('active', mode === 'height');
             
             if (mode === 'dist') {
                 actionBtn.style.display = 'none';
+                resultDisplay.style.color = "#32d74b";
                 updateCalculations();
             } else {
                 resetHeightState();
@@ -419,27 +469,29 @@
             heightStep = 1;
             storedDistanceMeters = 0;
             actionBtn.style.display = 'inline-block';
-            actionBtn.innerText = "2. Fixar Base";
-            actionBtn.style.backgroundColor = "#28a745";
+            actionBtn.innerText = "📍 Fixar Base";
+            actionBtn.style.backgroundColor = "#34c759";
             actionBtn.style.color = "#fff";
             resultDisplay.innerText = "Mire na BASE";
-            subInfo.innerText = "Mire no chão e fixe a base";
+            resultDisplay.style.color = "#ff453a";
+            subInfo.innerText = "Fixe a distância primeiro";
+            setCrosshairColor(false);
         }
 
         function handleAction() {
+            triggerHaptic();
             if (heightStep === 1) {
                 const d = getBaseDistance();
                 if (d === null) {
-                    alert("Mire no chão para fixar a base.");
+                    alert("Mire no chão primeiro.");
                     return;
                 }
                 storedDistanceMeters = d;
                 heightStep = 2;
-                actionBtn.innerText = "3. Medir Topo";
-                actionBtn.style.backgroundColor = "#ffc107";
-                actionBtn.style.color = "#000";
+                actionBtn.innerText = "🔄 Resetar Topo";
+                actionBtn.style.backgroundColor = "#ff9f0a";
                 resultDisplay.innerText = "Mire no TOPO";
-                subInfo.innerText = `Base salva (${d.toFixed(2)}m). Erga o celular!`;
+                subInfo.innerText = `Erga o celular!`;
             } else {
                 resetHeightState();
             }
