@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trena Virtual - Com Histórico de Medições</title>
+    <title>Trena Virtual - Interface Limpa e Dinâmica</title>
     <style>
-        /* Reset de estilo e layout fullscreen */
+        /* Estilização base ocupando 100% da tela */
         body {
             margin: 0;
             padding: 0;
@@ -25,18 +25,19 @@
             z-index: 1;
         }
 
-        /* Mirante central (Crosshair) */
+        /* Alvo central destacado (Crosshair) */
         #crosshair {
             position: absolute;
             top: 50%;
             left: 50%;
-            width: 22px;
-            height: 22px;
+            width: 24px;
+            height: 24px;
             transform: translate(-50%, -50%);
             border: 2px solid #00ff00;
             border-radius: 50%;
             z-index: 5;
             pointer-events: none;
+            box-shadow: 0 0 4px rgba(0,0,0,0.8);
         }
 
         #crosshair::after {
@@ -51,21 +52,21 @@
             border-radius: 50%;
         }
 
-        /* Painel superior de controle */
+        /* Painel compacto no topo para não cobrir o centro da tela */
         #controls-panel {
             position: absolute;
-            top: 15px;
+            top: 10px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.88);
+            background: rgba(0, 0, 0, 0.85);
             color: #ffffff;
-            padding: 15px;
-            border-radius: 15px;
-            font-size: 14px;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 13px;
             z-index: 10;
             text-align: center;
-            width: 85%;
-            max-height: 80vh;
+            width: 88%;
+            max-height: 40vh; /* Limita a altura para não cobrir o mira */
             overflow-y: auto;
             box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
@@ -73,18 +74,18 @@
         .mode-selector {
             display: flex;
             justify-content: center;
-            gap: 10px;
-            margin-bottom: 10px;
+            gap: 8px;
+            margin-bottom: 6px;
         }
 
         .mode-btn {
             background: #333;
             color: #fff;
             border: 1px solid #555;
-            padding: 6px 14px;
-            border-radius: 15px;
+            padding: 4px 12px;
+            border-radius: 12px;
             cursor: pointer;
-            font-size: 13px;
+            font-size: 12px;
         }
 
         .mode-btn.active {
@@ -94,63 +95,64 @@
         }
 
         .result-title {
-            font-size: 18px;
+            font-size: 17px;
             font-weight: bold;
             color: #00ff00;
-            margin: 5px 0;
+            margin: 4px 0;
         }
 
         .input-group {
-            margin-top: 8px;
-            font-size: 12px;
+            margin-top: 4px;
+            font-size: 11px;
         }
 
         .input-group input {
-            width: 55px;
-            padding: 3px;
+            width: 50px;
+            padding: 2px;
             text-align: center;
-            border-radius: 5px;
+            border-radius: 4px;
             border: 1px solid #ccc;
         }
 
-        /* Botões de Ação */
         .btn-action {
-            margin-top: 8px;
-            padding: 8px 14px;
-            font-size: 13px;
+            margin-top: 6px;
+            padding: 6px 10px;
+            font-size: 11px;
             font-weight: bold;
             color: #fff;
             border: none;
-            border-radius: 20px;
+            border-radius: 15px;
             cursor: pointer;
         }
 
         #calibrate-btn { background-color: #6c757d; }
         #action-btn { background-color: #28a745; display: none; }
-        #save-btn { background-color: #17a2b8; margin-left: 5px; }
+        #save-btn { background-color: #17a2b8; }
+        #toggle-history-btn { background-color: #555; }
 
-        /* Tabela de Histórico */
+        /* Histórico Retrátil (Escondido por padrão) */
         #history-section {
-            margin-top: 15px;
+            display: none; /* Inicia oculto para não obstruir */
+            margin-top: 10px;
             border-top: 1px solid #444;
-            padding-top: 10px;
+            padding-top: 8px;
             text-align: left;
         }
 
         #history-list {
             list-style: none;
             padding: 0;
-            margin: 8px 0;
-            max-height: 120px;
+            margin: 6px 0;
+            max-height: 100px;
             overflow-y: auto;
         }
 
         #history-list li {
             background: rgba(255, 255, 255, 0.1);
-            padding: 6px 10px;
-            border-radius: 5px;
-            margin-bottom: 4px;
-            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-bottom: 3px;
+            font-size: 11px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -172,7 +174,7 @@
             cursor: pointer;
         }
 
-        .error-message { color: #ff4d4d; font-size: 12px; margin-top: 4px; }
+        .error-message { color: #ff4d4d; font-size: 11px; margin-top: 2px; }
     </style>
 </head>
 <body>
@@ -187,32 +189,33 @@
         </div>
 
         <div id="result-display" class="result-title">Distância: -- m</div>
-        <div id="sub-info" style="font-size: 12px; color: #aaa;">Elevação: --° | Nível: --°</div>
+        <div id="sub-info" style="font-size: 11px; color: #aaa;">Elevação: --° | Zero: --°</div>
         <div id="error-display" class="error-message"></div>
         
         <div class="input-group">
-            <label for="user-height">Altura da Câmera até o chão (m): </label>
+            <label for="user-height">Altura da Câmera (m): </label>
             <input type="number" id="user-height" value="1.50" step="0.05" min="0.5" max="2.5">
         </div>
 
-        <div style="margin-top: 10px;">
-            <button class="btn-action" id="calibrate-btn" onclick="calibrateHorizon()">1. Calibrar Nível</button>
+        <div style="margin-top: 6px; display: flex; justify-content: center; gap: 4px; flex-wrap: wrap;">
+            <button class="btn-action" id="calibrate-btn" onclick="calibrateHorizon()">1. Calibrar</button>
             <button class="btn-action" id="action-btn" onclick="handleAction()">2. Fixar Base</button>
-            <button class="btn-action" id="save-btn" onclick="saveCurrentMeasurement()">Guardar Medida</button>
+            <button class="btn-action" id="save-btn" onclick="saveCurrentMeasurement()">Salvar</button>
+            <button class="btn-action" id="toggle-history-btn" onclick="toggleHistory()">📋 Histórico</button>
         </div>
 
-        <!-- Seção de Histórico -->
+        <!-- Seção de Histórico Retrátil -->
         <div id="history-section">
-            <strong style="font-size: 13px;">📋 Histórico de Medições</strong>
+            <strong style="font-size: 12px;">Histórico Guardado</strong>
             <ul id="history-list"></ul>
-            <button class="btn-action" style="background: #dc3545; font-size: 11px; padding: 4px 8px;" onclick="clearHistory()">Limpar Histórico</button>
+            <button class="btn-action" style="background: #dc3545; font-size: 10px; padding: 3px 6px;" onclick="clearHistory()">Apagar Tudo</button>
         </div>
     </div>
 
     <button id="permission-btn">Ativar Sensores e Câmera</button>
 
     <script>
-        // --- 1. REFERÊNCIAS VISUAIS E VARIÁVEIS DE ESTADO ---
+        // --- 1. ELEMENTOS VISUAIS E ESTADOS ---
         const videoElement = document.getElementById('camera-video');
         const resultDisplay = document.getElementById('result-display');
         const subInfo = document.getElementById('sub-info');
@@ -221,6 +224,7 @@
         const permissionBtn = document.getElementById('permission-btn');
         const actionBtn = document.getElementById('action-btn');
         const calibrateBtn = document.getElementById('calibrate-btn');
+        const historySection = document.getElementById('history-section');
         const historyList = document.getElementById('history-list');
 
         let currentMode = 'dist';
@@ -228,15 +232,13 @@
         let currentPitchDegrees = 0;
         let lastCalculatedValue = 0;
         
-        // Calibração do Horizonte (Padrão 90°)
         let horizonBeta = 90;
         let isCalibrated = false;
         let storedDistanceMeters = 0;
 
-        // Histórico em memória
         let savedMeasurements = JSON.parse(localStorage.getItem('trena_history') || '[]');
 
-        // --- 2. INICIALIZAÇÃO E PERMISSÕES ---
+        // --- 2. PERMISSÕES E LEITURA CONTÍNUA ---
         permissionBtn.addEventListener('click', async () => {
             errorDisplay.innerText = "";
             const camOk = await startCamera();
@@ -255,7 +257,7 @@
                 videoElement.srcObject = stream;
                 return true;
             } catch (err) {
-                errorDisplay.innerText = "Erro ao abrir câmera: " + err.message;
+                errorDisplay.innerText = "Erro na câmera: " + err.message;
                 return false;
             }
         }
@@ -268,7 +270,7 @@
                         window.addEventListener('deviceorientation', handleOrientation);
                         return true;
                     } else {
-                        errorDisplay.innerText = "Permissão ao giroscópio negada.";
+                        errorDisplay.innerText = "Giroscópio negado.";
                         return false;
                     }
                 } catch (e) {
@@ -281,11 +283,11 @@
             }
         }
 
-        // --- 3. LEITURA DE SENSORES E CÁLCULO ---
+        // Executado continuamente a cada movimento do celular
         function handleOrientation(event) {
             if (event.beta !== null) {
                 currentPitchDegrees = event.beta;
-                updateCalculations();
+                updateCalculations(); // Garante atualização em tempo real
             }
         }
 
@@ -297,10 +299,11 @@
             horizonBeta = currentPitchDegrees;
             isCalibrated = true;
             calibrateBtn.style.backgroundColor = "#17a2b8";
-            calibrateBtn.innerText = "Nível Calibrado ✓";
+            calibrateBtn.innerText = "Calibrado ✓";
             updateCalculations();
         }
 
+        // --- 3. CÁLCULO TRIGONOMÉTRICO DINÂMICO ---
         function getBaseDistance() {
             const h = parseFloat(userHeightInput.value);
             const elevation = getElevationDegrees();
@@ -317,7 +320,7 @@
             return h + (distance * Math.tan(elevationRad));
         }
 
-        // --- 4. ATUALIZAÇÃO DA INTERFACE VISUAL ---
+        // --- 4. ATUALIZAÇÃO DA TELA EM TEMPO REAL ---
         function updateCalculations() {
             const elevation = getElevationDegrees();
             const subText = `Elevação: ${elevation.toFixed(1)}° | Zero: ${horizonBeta.toFixed(1)}°`;
@@ -325,11 +328,12 @@
             if (currentMode === 'dist') {
                 const d = getBaseDistance();
                 if (d === null) {
-                    resultDisplay.innerText = isCalibrated ? "Apunte para o CHÃO" : "Calibre olhando em frente";
+                    resultDisplay.innerText = isCalibrated ? "Mire no CHÃO" : "Calibre em frente";
                     subInfo.innerText = subText;
                     lastCalculatedValue = 0;
                 } else {
                     lastCalculatedValue = d;
+                    // ATUALIZAÇÃO DINÂMICA: Exibe o valor em tempo real conforme você move o celular
                     resultDisplay.innerText = `Distância: ${d.toFixed(2)} m`;
                     subInfo.innerText = `${subText} | ${(d * 100).toFixed(0)} cm`;
                 }
@@ -341,15 +345,20 @@
             }
         }
 
-        // --- 5. GESTÃO DO HISTÓRICO DE MEDIÇÕES ---
+        // --- 5. HISTÓRICO RETRÁTIL E SALVAMENTO ---
+        function toggleHistory() {
+            const isHidden = historySection.style.display === 'none' || historySection.style.display === '';
+            historySection.style.display = isHidden ? 'block' : 'none';
+        }
+
         function saveCurrentMeasurement() {
             if (lastCalculatedValue <= 0) {
-                alert("Nenhuma medição válida para guardar no momento.");
+                alert("Nenhuma medição válida no momento para salvar.");
                 return;
             }
 
-            const label = prompt("Digite um nome/rótulo para esta medição:", currentMode === 'dist' ? "Parede" : "Altura Objeto");
-            if (label === null) return; // Utilizador cancelou
+            const label = prompt("Nome da medição:", currentMode === 'dist' ? "Distância" : "Altura");
+            if (label === null) return;
 
             const item = {
                 id: Date.now(),
@@ -366,13 +375,13 @@
         function renderHistory() {
             historyList.innerHTML = "";
             if (savedMeasurements.length === 0) {
-                historyList.innerHTML = "<li style='color: #aaa;'>Nenhuma medição guardada.</li>";
+                historyList.innerHTML = "<li style='color: #aaa;'>Nenhum registro.</li>";
                 return;
             }
 
             savedMeasurements.forEach(item => {
                 const li = document.createElement('li');
-                li.innerHTML = `<span><strong>${item.label}:</strong> ${item.value} m (${item.type})</span>
+                li.innerHTML = `<span><strong>${item.label}:</strong> ${item.value} m</span>
                                 <button onclick="deleteHistoryItem(${item.id})" style="background:none; border:none; color:#ff4d4d; cursor:pointer;">✕</button>`;
                 historyList.appendChild(li);
             });
@@ -385,14 +394,14 @@
         }
 
         function clearHistory() {
-            if (confirm("Deseja apagar todo o histórico de medições?")) {
+            if (confirm("Apagar todo o histórico?")) {
                 savedMeasurements = [];
                 localStorage.removeItem('trena_history');
                 renderHistory();
             }
         }
 
-        // --- 6. MÁQUINA DE ESTADOS E MODOS ---
+        // --- 6. TROCA DE MODO ---
         function switchMode(mode) {
             currentMode = mode;
             document.getElementById('btn-mode-dist').classList.toggle('active', mode === 'dist');
@@ -410,34 +419,33 @@
             heightStep = 1;
             storedDistanceMeters = 0;
             actionBtn.style.display = 'inline-block';
-            actionBtn.innerText = "2. Fixar Base (Chão)";
+            actionBtn.innerText = "2. Fixar Base";
             actionBtn.style.backgroundColor = "#28a745";
             actionBtn.style.color = "#fff";
-            resultDisplay.innerText = "Mire na BASE do objeto";
-            subInfo.innerText = "Apunte para o chão e fixe a distância";
+            resultDisplay.innerText = "Mire na BASE";
+            subInfo.innerText = "Mire no chão e fixe a base";
         }
 
         function handleAction() {
             if (heightStep === 1) {
                 const d = getBaseDistance();
                 if (d === null) {
-                    alert("Por favor, mire no chão para fixar a base.");
+                    alert("Mire no chão para fixar a base.");
                     return;
                 }
                 storedDistanceMeters = d;
                 heightStep = 2;
-                actionBtn.innerText = "3. Medir Topo (Resetar)";
+                actionBtn.innerText = "3. Medir Topo";
                 actionBtn.style.backgroundColor = "#ffc107";
                 actionBtn.style.color = "#000";
-                resultDisplay.innerText = "Mire no TOPO do objeto";
-                subInfo.innerText = `Base salva (${d.toFixed(2)}m). Erga o celular para medir!`;
+                resultDisplay.innerText = "Mire no TOPO";
+                subInfo.innerText = `Base salva (${d.toFixed(2)}m). Erga o celular!`;
             } else {
                 resetHeightState();
             }
         }
 
         userHeightInput.addEventListener('input', updateCalculations);
-        renderHistory();
     </script>
 </body>
 </html>
