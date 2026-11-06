@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trena Virtual - Com Calibração de Horizonte</title>
+    <title>Trena Virtual - Com Histórico de Medições</title>
     <style>
         /* Reset de estilo e layout fullscreen */
         body {
@@ -65,6 +65,8 @@
             z-index: 10;
             text-align: center;
             width: 85%;
+            max-height: 80vh;
+            overflow-y: auto;
             box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
 
@@ -125,6 +127,34 @@
 
         #calibrate-btn { background-color: #6c757d; }
         #action-btn { background-color: #28a745; display: none; }
+        #save-btn { background-color: #17a2b8; margin-left: 5px; }
+
+        /* Tabela de Histórico */
+        #history-section {
+            margin-top: 15px;
+            border-top: 1px solid #444;
+            padding-top: 10px;
+            text-align: left;
+        }
+
+        #history-list {
+            list-style: none;
+            padding: 0;
+            margin: 8px 0;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+
+        #history-list li {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 6px 10px;
+            border-radius: 5px;
+            margin-bottom: 4px;
+            font-size: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
 
         #permission-btn {
             position: absolute;
@@ -165,8 +195,18 @@
             <input type="number" id="user-height" value="1.50" step="0.05" min="0.5" max="2.5">
         </div>
 
-        <button class="btn-action" id="calibrate-btn" onclick="calibrateHorizon()">1. Calibrar Nível (Olhar em Frente)</button>
-        <button class="btn-action" id="action-btn" onclick="handleAction()">2. Fixar Base (Chão)</button>
+        <div style="margin-top: 10px;">
+            <button class="btn-action" id="calibrate-btn" onclick="calibrateHorizon()">1. Calibrar Nível</button>
+            <button class="btn-action" id="action-btn" onclick="handleAction()">2. Fixar Base</button>
+            <button class="btn-action" id="save-btn" onclick="saveCurrentMeasurement()">Guardar Medida</button>
+        </div>
+
+        <!-- Seção de Histórico -->
+        <div id="history-section">
+            <strong style="font-size: 13px;">📋 Histórico de Medições</strong>
+            <ul id="history-list"></ul>
+            <button class="btn-action" style="background: #dc3545; font-size: 11px; padding: 4px 8px;" onclick="clearHistory()">Limpar Histórico</button>
+        </div>
     </div>
 
     <button id="permission-btn">Ativar Sensores e Câmera</button>
@@ -181,25 +221,29 @@
         const permissionBtn = document.getElementById('permission-btn');
         const actionBtn = document.getElementById('action-btn');
         const calibrateBtn = document.getElementById('calibrate-btn');
+        const historyList = document.getElementById('history-list');
 
         let currentMode = 'dist';
         let heightStep = 1;
         let currentPitchDegrees = 0;
+        let lastCalculatedValue = 0;
         
-        // Calibração do Horizonte (Padrão 90°, ajustável pelo usuário)
+        // Calibração do Horizonte (Padrão 90°)
         let horizonBeta = 90;
         let isCalibrated = false;
-
-        // Memória para o cálculo da Altura
         let storedDistanceMeters = 0;
 
-        // --- 2. INICIALIZAÇÃO DE SENSORES E CÂMERA ---
+        // Histórico em memória
+        let savedMeasurements = JSON.parse(localStorage.getItem('trena_history') || '[]');
+
+        // --- 2. INICIALIZAÇÃO E PERMISSÕES ---
         permissionBtn.addEventListener('click', async () => {
             errorDisplay.innerText = "";
             const camOk = await startCamera();
             const sensorOk = await requestOrientationPermission();
             if (camOk && sensorOk) {
                 permissionBtn.style.display = 'none';
+                renderHistory();
             }
         });
 
@@ -237,7 +281,7 @@
             }
         }
 
-        // --- 3. LEITURA CONTINUA DO GIROSCÓPIO E CÁLCULO DE ELEVAÇÃO ---
+        // --- 3. LEITURA DE SENSORES E CÁLCULO ---
         function handleOrientation(event) {
             if (event.beta !== null) {
                 currentPitchDegrees = event.beta;
@@ -245,12 +289,10 @@
             }
         }
 
-        // Retorna o ângulo relativo ao horizonte calibrado (0° = Nível dos Olhos)
         function getElevationDegrees() {
             return currentPitchDegrees - horizonBeta;
         }
 
-        // Calibra o zero olhando para a frente na horizontal
         function calibrateHorizon() {
             horizonBeta = currentPitchDegrees;
             isCalibrated = true;
@@ -259,35 +301,23 @@
             updateCalculations();
         }
 
-        // --- 4. CÁLCULOS TRIGONOMÉTRICOS EXPLICITOS ---
         function getBaseDistance() {
             const h = parseFloat(userHeightInput.value);
             const elevation = getElevationDegrees();
-
-            // A base deve estar abaixo do horizonte (elevação negativa)
-            // Se o ângulo for maior que -2°, o celular está olhando horizontalmente ou para cima
             if (!Number.isFinite(h) || h <= 0 || elevation >= -2) return null;
-
-            // Converter graus em radianos
             const elevationRad = elevation * (Math.PI / 180);
-
-            // Fórmula: d = -h / tan(elevação_negativa)
             return -h / Math.tan(elevationRad);
         }
 
         function getObjectHeight(distance) {
             const h = parseFloat(userHeightInput.value);
             const elevation = getElevationDegrees();
-
             if (!Number.isFinite(h) || h <= 0) return 0;
-
             const elevationRad = elevation * (Math.PI / 180);
-
-            // Fórmula: Altura = AlturaCâmera + distância * tan(elevação)
             return h + (distance * Math.tan(elevationRad));
         }
 
-        // --- 5. ATUALIZAÇÃO DA INTERFACE VISUAL ---
+        // --- 4. ATUALIZAÇÃO DA INTERFACE VISUAL ---
         function updateCalculations() {
             const elevation = getElevationDegrees();
             const subText = `Elevação: ${elevation.toFixed(1)}° | Zero: ${horizonBeta.toFixed(1)}°`;
@@ -295,21 +325,74 @@
             if (currentMode === 'dist') {
                 const d = getBaseDistance();
                 if (d === null) {
-                    resultDisplay.innerText = isCalibrated ? "Apunte para o CHÃO (abaixo do nível)" : "Calibre olhando em frente";
+                    resultDisplay.innerText = isCalibrated ? "Apunte para o CHÃO" : "Calibre olhando em frente";
                     subInfo.innerText = subText;
+                    lastCalculatedValue = 0;
                 } else {
+                    lastCalculatedValue = d;
                     resultDisplay.innerText = `Distância: ${d.toFixed(2)} m`;
                     subInfo.innerText = `${subText} | ${(d * 100).toFixed(0)} cm`;
                 }
             } else if (currentMode === 'height' && heightStep === 2) {
                 const totalHeight = getObjectHeight(storedDistanceMeters);
-                
+                lastCalculatedValue = totalHeight;
                 resultDisplay.innerText = `Altura: ${totalHeight.toFixed(2)} m`;
                 subInfo.innerText = `Dist. Base: ${storedDistanceMeters.toFixed(2)}m | ${subText}`;
             }
         }
 
-        // --- 6. GERENCIAMENTO DE MODOS E BOTÕES ---
+        // --- 5. GESTÃO DO HISTÓRICO DE MEDIÇÕES ---
+        function saveCurrentMeasurement() {
+            if (lastCalculatedValue <= 0) {
+                alert("Nenhuma medição válida para guardar no momento.");
+                return;
+            }
+
+            const label = prompt("Digite um nome/rótulo para esta medição:", currentMode === 'dist' ? "Parede" : "Altura Objeto");
+            if (label === null) return; // Utilizador cancelou
+
+            const item = {
+                id: Date.now(),
+                label: label || (currentMode === 'dist' ? "Distância" : "Altura"),
+                type: currentMode === 'dist' ? "Distância" : "Altura",
+                value: lastCalculatedValue.toFixed(2)
+            };
+
+            savedMeasurements.push(item);
+            localStorage.setItem('trena_history', JSON.stringify(savedMeasurements));
+            renderHistory();
+        }
+
+        function renderHistory() {
+            historyList.innerHTML = "";
+            if (savedMeasurements.length === 0) {
+                historyList.innerHTML = "<li style='color: #aaa;'>Nenhuma medição guardada.</li>";
+                return;
+            }
+
+            savedMeasurements.forEach(item => {
+                const li = document.createElement('li');
+                li.innerHTML = `<span><strong>${item.label}:</strong> ${item.value} m (${item.type})</span>
+                                <button onclick="deleteHistoryItem(${item.id})" style="background:none; border:none; color:#ff4d4d; cursor:pointer;">✕</button>`;
+                historyList.appendChild(li);
+            });
+        }
+
+        function deleteHistoryItem(id) {
+            savedMeasurements = savedMeasurements.filter(item => item.id !== id);
+            localStorage.setItem('trena_history', JSON.stringify(savedMeasurements));
+            renderHistory();
+        }
+
+        function clearHistory() {
+            if (confirm("Deseja apagar todo o histórico de medições?")) {
+                savedMeasurements = [];
+                localStorage.removeItem('trena_history');
+                renderHistory();
+            }
+        }
+
+        // --- 6. MÁQUINA DE ESTADOS E MODOS ---
         function switchMode(mode) {
             currentMode = mode;
             document.getElementById('btn-mode-dist').classList.toggle('active', mode === 'dist');
@@ -338,12 +421,11 @@
             if (heightStep === 1) {
                 const d = getBaseDistance();
                 if (d === null) {
-                    alert("Por favor, mire no chão (abaixo do nível de calibração) para fixar a base.");
+                    alert("Por favor, mire no chão para fixar a base.");
                     return;
                 }
                 storedDistanceMeters = d;
                 heightStep = 2;
-                
                 actionBtn.innerText = "3. Medir Topo (Resetar)";
                 actionBtn.style.backgroundColor = "#ffc107";
                 actionBtn.style.color = "#000";
@@ -355,6 +437,7 @@
         }
 
         userHeightInput.addEventListener('input', updateCalculations);
+        renderHistory();
     </script>
 </body>
 </html>
