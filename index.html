@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trena Virtual - Giroscópio e Trigonometria</title>
+    <title>Trena Virtual - Distância e Altura</title>
     <style>
-        /* Estilização para ocupar 100% da tela do smartphone */
+        /* Reset e layout ocupar 100% da tela */
         body {
             margin: 0;
             padding: 0;
@@ -14,7 +14,7 @@
             background-color: #000;
         }
 
-        /* Elemento de vídeo para a câmera traseira */
+        /* Vídeo da câmera traseira */
         #camera-video {
             position: absolute;
             top: 0;
@@ -25,13 +25,13 @@
             z-index: 1;
         }
 
-        /* Mirante central (Crosshair) para apontar para a base do objeto no chão */
+        /* Mirante central (Crosshair) */
         #crosshair {
             position: absolute;
             top: 50%;
             left: 50%;
-            width: 20px;
-            height: 20px;
+            width: 22px;
+            height: 22px;
             transform: translate(-50%, -50%);
             border: 2px solid #00ff00;
             border-radius: 50%;
@@ -51,39 +51,83 @@
             border-radius: 50%;
         }
 
-        /* Painel superior com resultados e controles de altura */
+        /* Painel principal de controle */
         #controls-panel {
             position: absolute;
-            top: 20px;
+            top: 15px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.85);
             color: #ffffff;
             padding: 15px;
             border-radius: 15px;
-            font-size: 16px;
+            font-size: 15px;
             z-index: 10;
             text-align: center;
             width: 85%;
             box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
 
-        /* Estilização da caixa de texto da altura */
+        /* Seletor de Modo (Abas) */
+        .mode-selector {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .mode-btn {
+            background: #333;
+            color: #fff;
+            border: 1px solid #555;
+            padding: 6px 14px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .mode-btn.active {
+            background: #007bff;
+            border-color: #007bff;
+            font-weight: bold;
+        }
+
+        /* Estilização dos resultados */
+        .result-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #00ff00;
+            margin: 5px 0;
+        }
+
         .input-group {
             margin-top: 8px;
-            font-size: 14px;
+            font-size: 13px;
         }
 
         .input-group input {
-            width: 60px;
-            padding: 4px;
+            width: 55px;
+            padding: 3px;
             text-align: center;
             border-radius: 5px;
             border: 1px solid #ccc;
-            font-size: 14px;
         }
 
-        /* Botão para solicitar permissão de sensores em navegadores restritos */
+        /* Botão de ação (Capturar topo/base) */
+        #action-btn {
+            margin-top: 10px;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #fff;
+            background-color: #28a745;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            display: none;
+        }
+
+        /* Botão de início */
         #permission-btn {
             position: absolute;
             bottom: 30px;
@@ -103,19 +147,25 @@
 </head>
 <body>
 
-    <!-- Elementos visuais principais -->
     <video id="camera-video" autoplay playsinline></video>
     <div id="crosshair"></div>
 
-    <!-- Painel de informação e configuração de altura -->
     <div id="controls-panel">
-        <div id="distance-display">Distância: -- m</div>
-        <div id="angle-display" style="font-size: 12px; color: #aaa; margin-top: 4px;">Inclinação: --°</div>
+        <!-- Seletor de Modo -->
+        <div class="mode-selector">
+            <button class="mode-btn active" id="btn-mode-dist" onclick="switchMode('dist')">Distância</button>
+            <button class="mode-btn" id="btn-mode-height" onclick="switchMode('height')">Altura</button>
+        </div>
+
+        <div id="result-display" class="result-title">Distância: -- m</div>
+        <div id="sub-info" style="font-size: 12px; color: #aaa;">Inclinação: --°</div>
         
         <div class="input-group">
-            <label for="user-height">Altura do celular (m): </label>
+            <label for="user-height">Sua altura do celular (m): </label>
             <input type="number" id="user-height" value="1.50" step="0.05" min="0.5" max="2.5">
         </div>
+
+        <button id="action-btn" onclick="handleAction()">1º Passo: Fixar Base</button>
     </div>
 
     <button id="permission-btn">Ativar Sensores e Câmera</button>
@@ -123,21 +173,26 @@
     <script>
         // --- DOCUMENTAÇÃO DAS VARIÁVEIS GLOBAIS ---
         const videoElement = document.getElementById('camera-video');
-        const distanceDisplay = document.getElementById('distance-display');
-        const angleDisplay = document.getElementById('angle-display');
+        const resultDisplay = document.getElementById('result-display');
+        const subInfo = document.getElementById('sub-info');
         const userHeightInput = document.getElementById('user-height');
         const permissionBtn = document.getElementById('permission-btn');
+        const actionBtn = document.getElementById('action-btn');
 
+        let currentMode = 'dist'; // 'dist' ou 'height'
+        let heightStep = 1;       // 1: Capturar Base, 2: Capturar Topo
         let currentPitchDegrees = 0;
+        
+        // Memória para o cálculo da altura
+        let storedDistanceMeters = 0;
 
-        // --- PASSO 1: INICIALIZAÇÃO DA CÂMERA E DOS SENSORES ---
+        // --- PASSO 1: ATIVAÇÃO DE SENSORES E CÂMERA ---
         permissionBtn.addEventListener('click', async () => {
             await startCamera();
             await requestOrientationPermission();
             permissionBtn.style.display = 'none';
         });
 
-        // Função para abrir a câmera traseira do celular
         async function startCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
@@ -145,76 +200,114 @@
                 });
                 videoElement.srcObject = stream;
             } catch (err) {
-                alert("Erro ao acessar a câmera traseira: " + err.message);
+                alert("Erro ao acessar a câmera: " + err.message);
             }
         }
 
-        // Função para solicitar acesso ao Giroscópio/Acelerômetro
         async function requestOrientationPermission() {
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                // Necessário para navegadores iOS Safari
                 try {
                     const response = await DeviceOrientationEvent.requestPermission();
                     if (response === 'granted') {
                         window.addEventListener('deviceorientation', handleOrientation);
-                    } else {
-                        alert("Permissão para giroscópio foi negada.");
                     }
-                } catch (e) {
-                    console.error(e);
-                }
+                } catch (e) { console.error(e); }
             } else {
-                // Padrão para Android / Chrome
                 window.addEventListener('deviceorientation', handleOrientation);
             }
         }
 
-        // --- PASSO 2: CAPTURA DO ÂNGULO DE INCLINAÇÃO (PITCH) ---
+        // --- PASSO 2: LEITURA DO GIROSCÓPIO ---
         function handleOrientation(event) {
-            // event.beta representa a inclinação frente/trás em graus (-180 a 180)
-            let beta = event.beta; 
-
-            if (beta !== null) {
-                currentPitchDegrees = beta;
-                calculateDistance();
+            if (event.beta !== null) {
+                currentPitchDegrees = event.beta;
+                updateCalculations();
             }
         }
 
-        // --- PASSO 3: LÓGICA MATEMÁTICA E CÁLCULO DA DISTÂNCIA ---
-        function calculateDistance() {
-            // Obtém a altura configurada pelo usuário (em metros)
-            const height = parseFloat(userHeightInput.value) || 1.50;
+        // --- PASSO 3: GERENCIAMENTO DE MODOS E CÁLCULOS ---
+        function switchMode(mode) {
+            currentMode = mode;
+            document.getElementById('btn-mode-dist').classList.toggle('active', mode === 'dist');
+            document.getElementById('btn-mode-height').classList.toggle('active', mode === 'height');
+            
+            if (mode === 'dist') {
+                actionBtn.style.display = 'none';
+                updateCalculations();
+            } else {
+                heightStep = 1;
+                actionBtn.style.display = 'inline-block';
+                actionBtn.innerText = "1º Passo: Fixar Base (Chão)";
+                resultDisplay.innerText = "Mire na BASE do objeto";
+                subInfo.innerText = "Aperte o botão para fixar a distância";
+            }
+        }
 
-            // Ajusta o ângulo considerando que 90° é o celular em pé na vertical.
-            // Quanto mais apontamos para o chão, menor é o ângulo com a horizontal.
+        function getHorizontalDistance() {
+            const h = parseFloat(userHeightInput.value) || 1.50;
             let angleFromHorizontal = 90 - currentPitchDegrees;
 
-            // Limitações de segurança para evitar divisão por zero ou ângulos negativos (apontando para cima)
-            if (angleFromHorizontal <= 1) {
-                distanceDisplay.innerText = "Distância: Apunte para o chão";
-                angleDisplay.innerText = `Inclinação: ${currentPitchDegrees.toFixed(1)}°`;
-                return;
-            }
+            if (angleFromHorizontal <= 1 || angleFromHorizontal >= 89) return null;
 
-            if (angleFromHorizontal >= 89) {
-                distanceDisplay.innerText = "Distância: Muito próximo";
-                angleDisplay.innerText = `Inclinação: ${currentPitchDegrees.toFixed(1)}°`;
-                return;
-            }
-
-            // Converter graus para radianos para usar na função Math.tan() do JS
             const angleRadians = angleFromHorizontal * (Math.PI / 180);
-
-            // Fórmula Trigonométrica: Distância = Altura / tan(ângulo_com_a_horizontal)
-            const distanceMeters = height / Math.tan(angleRadians);
-
-            // Atualiza a interface gráfica
-            angleDisplay.innerText = `Inclinação: ${currentPitchDegrees.toFixed(1)}°`;
-            distanceDisplay.innerText = `Distância: ${distanceMeters.toFixed(2)} m (${(distanceMeters * 100).toFixed(0)} cm)`;
+            return h / Math.tan(angleRadians);
         }
 
-        // Recalcular quando o usuário alterar a altura no input
-        userHeightInput.addEventListener('input', calculateDistance);
+        function updateCalculations() {
+            if (currentMode === 'dist') {
+                const d = getHorizontalDistance();
+                if (d === null) {
+                    resultDisplay.innerText = "Distância: --";
+                    subInfo.innerText = `Inclinação: ${currentPitchDegrees.toFixed(1)}°`;
+                } else {
+                    resultDisplay.innerText = `Distância: ${d.toFixed(2)} m`;
+                    subInfo.innerText = `Inclinação: ${currentPitchDegrees.toFixed(1)}° | ${(d * 100).toFixed(0)} cm`;
+                }
+            } else if (currentMode === 'height' && heightStep === 2) {
+                // Cálculo da Altura durante a Etapa 2 (Apontando para o topo)
+                const eyeHeight = parseFloat(userHeightInput.value) || 1.50;
+                
+                // Ângulo de elevação acima ou abaixo da linha dos olhos (horizonte = 90° pitch)
+                let elevationAngleDegrees = 90 - currentPitchDegrees;
+                let elevationRadians = elevationAngleDegrees * (Math.PI / 180);
+                
+                // Fórmula da Altura: H = h_olhos + (distância_horizontal * tan(ângulo_elevação))
+                let calculatedObjectHeight = eyeHeight - (storedDistanceMeters * Math.tan(elevationRadians));
+
+                if (calculatedObjectHeight < 0) calculatedObjectHeight = 0;
+
+                resultDisplay.innerText = `Altura: ${calculatedObjectHeight.toFixed(2)} m`;
+                subInfo.innerText = `Dist. Base: ${storedDistanceMeters.toFixed(2)}m | Topo: ${currentPitchDegrees.toFixed(1)}°`;
+            }
+        }
+
+        // --- PASSO 4: FLUXO DE MEDIÇÃO DA ALTURA ---
+        function handleAction() {
+            if (heightStep === 1) {
+                // Fixa a base
+                const d = getHorizontalDistance();
+                if (d === null) {
+                    alert("Apunte para o chão para fixar a base corretamente.");
+                    return;
+                }
+                storedDistanceMeters = d;
+                heightStep = 2;
+                actionBtn.innerText = "2º Passo: Medir Topo";
+                actionBtn.style.backgroundColor = "#ffc107";
+                actionBtn.style.color = "#000";
+                resultDisplay.innerText = "Mire no TOPO do objeto";
+                subInfo.innerText = `Base salva: ${d.toFixed(2)}m. Agora incline para cima!`;
+            } else {
+                // Reseta para nova medição de altura
+                heightStep = 1;
+                actionBtn.innerText = "1º Passo: Fixar Base (Chão)";
+                actionBtn.style.backgroundColor = "#28a745";
+                actionBtn.style.color = "#fff";
+                updateCalculations();
+            }
+        }
+
+        userHeightInput.addEventListener('input', updateCalculations);
     </script>
 </body>
 </html>
