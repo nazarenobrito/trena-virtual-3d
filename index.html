@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trena Virtual - Versão Corrigida</title>
+    <title>Trena Virtual - Altura Corrigida</title>
     <style>
+        /* Reset de estilo e layout fullscreen */
         body {
             margin: 0;
             padding: 0;
@@ -13,6 +14,7 @@
             background-color: #000;
         }
 
+        /* Elemento de vídeo da câmera traseira */
         #camera-video {
             position: absolute;
             top: 0;
@@ -23,6 +25,7 @@
             z-index: 1;
         }
 
+        /* Retículo/Mira central */
         #crosshair {
             position: absolute;
             top: 50%;
@@ -48,6 +51,7 @@
             border-radius: 50%;
         }
 
+        /* Painel superior de controle */
         #controls-panel {
             position: absolute;
             top: 15px;
@@ -169,7 +173,7 @@
     <button id="permission-btn">Ativar Sensores e Câmera</button>
 
     <script>
-        // --- 1. REFERÊNCIAS VISUAIS DA INTERFACE ---
+        // --- 1. REFERÊNCIAS VISUAIS E VARIÁVEIS DE ESTADO ---
         const videoElement = document.getElementById('camera-video');
         const resultDisplay = document.getElementById('result-display');
         const subInfo = document.getElementById('sub-info');
@@ -178,18 +182,19 @@
         const permissionBtn = document.getElementById('permission-btn');
         const actionBtn = document.getElementById('action-btn');
 
-        // Variáveis de Estado
         let currentMode = 'dist';
         let heightStep = 1;
         let currentPitchDegrees = 0;
+        
+        // Memória da Medição de Altura
         let storedDistanceMeters = 0;
+        let basePitchDegrees = 0; // Ângulo gravado na base (chão)
 
-        // --- 2. TRATAMENTO DE PERMISSÕES E CÂMERA ---
+        // --- 2. INICIALIZAÇÃO DE SENSORES E CÂMERA ---
         permissionBtn.addEventListener('click', async () => {
             errorDisplay.innerText = "";
             const camOk = await startCamera();
             const sensorOk = await requestOrientationPermission();
-            
             if (camOk && sensorOk) {
                 permissionBtn.style.display = 'none';
             }
@@ -203,7 +208,7 @@
                 videoElement.srcObject = stream;
                 return true;
             } catch (err) {
-                errorDisplay.innerText = "Câmera não permitida ou indisponível.";
+                errorDisplay.innerText = "Erro ao abrir câmera: " + err.message;
                 return false;
             }
         }
@@ -220,7 +225,7 @@
                         return false;
                     }
                 } catch (e) {
-                    errorDisplay.innerText = "Erro ao solicitar sensores.";
+                    errorDisplay.innerText = "Erro nos sensores.";
                     return false;
                 }
             } else {
@@ -229,7 +234,7 @@
             }
         }
 
-        // --- 3. CAPTURA E NORMALIZAÇÃO DO GIROSCÓPIO ---
+        // --- 3. LEITURA CONTINUA DO GIROSCÓPIO ---
         function handleOrientation(event) {
             if (event.beta !== null) {
                 currentPitchDegrees = event.beta;
@@ -237,7 +242,7 @@
             }
         }
 
-        // --- 4. TROCA DE MODO E RESET DA INTERFACE ---
+        // --- 4. TROCA DE MODO E RESET DA TELA ---
         function switchMode(mode) {
             currentMode = mode;
             document.getElementById('btn-mode-dist').classList.toggle('active', mode === 'dist');
@@ -251,9 +256,10 @@
             }
         }
 
-        // Função de Reset Explícita para evitar textos presos na tela
         function resetHeightState() {
             heightStep = 1;
+            storedDistanceMeters = 0;
+            basePitchDegrees = 0;
             actionBtn.style.display = 'inline-block';
             actionBtn.innerText = "1º Passo: Fixar Base (Chão)";
             actionBtn.style.backgroundColor = "#28a745";
@@ -262,27 +268,28 @@
             subInfo.innerText = "Aperte o botão para fixar a distância";
         }
 
-        // --- 5. LÓGICA TRIGONOMÉTRICA REVISADA ---
+        // --- 5. CÁLCULO DA DISTÂNCIA HORIZONTAL E ALTURA ---
         function getHorizontalDistance() {
             const eyeHeight = parseFloat(userHeightInput.value) || 1.50;
             
-            // Ângulo de inclinação com a horizontal (90° = vertical / 0° = horizontal)
-            let angleFromHorizontal = 90 - currentPitchDegrees;
+            // Quanto mais apontamos para o chão, maior o pitch (ex: > 90°)
+            // Ângulo de depressão em relação ao horizonte (90°)
+            let depressionAngle = currentPitchDegrees - 90;
 
-            // Filtro de segurança (Clamp flexibilizado usando Math.abs)
-            if (angleFromHorizontal <= 2 || angleFromHorizontal >= 88) {
+            // Se o celular estiver apontado para cima ou na horizontal pura
+            if (depressionAngle <= 2 || depressionAngle >= 88) {
                 return null;
             }
 
-            const angleRadians = angleFromHorizontal * (Math.PI / 180);
-            return eyeHeight / Math.tan(angleRadians);
+            const angleRadians = depressionAngle * (Math.PI / 180);
+            return eyeHeight * Math.tan(angleRadians);
         }
 
         function updateCalculations() {
             if (currentMode === 'dist') {
                 const d = getHorizontalDistance();
                 if (d === null) {
-                    resultDisplay.innerText = "Mire mais para o chão";
+                    resultDisplay.innerText = "Mire para o chão";
                     subInfo.innerText = `Inclinação: ${currentPitchDegrees.toFixed(1)}°`;
                 } else {
                     resultDisplay.innerText = `Distância: ${d.toFixed(2)} m`;
@@ -291,22 +298,30 @@
             } else if (currentMode === 'height' && heightStep === 2) {
                 const eyeHeight = parseFloat(userHeightInput.value) || 1.50;
                 
-                // Elevação em relação à linha do horizonte (90° pitch)
-                // Se pitch < 90° (inclinado para cima), elevationAngle é positivo!
-                let elevationAngleDegrees = 90 - currentPitchDegrees;
-                let elevationRadians = elevationAngleDegrees * (Math.PI / 180);
+                // Ângulo da base em relação à horizontal (90°)
+                let alphaBaseDeg = basePitchDegrees - 90;
+                let alphaBaseRad = alphaBaseDeg * (Math.PI / 180);
 
-                // FÓRMULA CORRIGIDA: H = AlturaOlho + (Distância * tan(ÂnguloElevação))
-                let calculatedObjectHeight = eyeHeight + (storedDistanceMeters * Math.tan(elevationRadians));
+                // Ângulo atual do topo em relação à horizontal (90°)
+                // Quando erguemos o celular, currentPitchDegrees FICA MENOR que 90°
+                let alphaTopoDeg = 90 - currentPitchDegrees; 
+                let alphaTopoRad = alphaTopoDeg * (Math.PI / 180);
 
-                if (calculatedObjectHeight < 0) calculatedObjectHeight = 0;
+                // LÓGICA DE ALTURA CORRIGIDA:
+                // Altura Total = Altura da parte abaixo dos olhos + Altura da parte acima dos olhos
+                // h_abaixo = d / tan(alphaBase)  --> que é igual à altura do olho
+                // h_acima  = d * tan(alphaTopo)
+                let heightAboveEye = storedDistanceMeters * Math.tan(alphaTopoRad);
+                let totalHeight = eyeHeight + heightAboveEye;
 
-                resultDisplay.innerText = `Altura: ${calculatedObjectHeight.toFixed(2)} m`;
+                if (totalHeight < 0) totalHeight = 0;
+
+                resultDisplay.innerText = `Altura: ${totalHeight.toFixed(2)} m`;
                 subInfo.innerText = `Dist. Base: ${storedDistanceMeters.toFixed(2)}m | Topo: ${currentPitchDegrees.toFixed(1)}°`;
             }
         }
 
-        // --- 6. FLUXO DE MEDIÇÃO DE ALTURA (AÇÕES DO BOTÃO) ---
+        // --- 6. MÁQUINA DE ESTADOS DO BOTÃO DE ALTURA ---
         function handleAction() {
             if (heightStep === 1) {
                 const d = getHorizontalDistance();
@@ -315,14 +330,15 @@
                     return;
                 }
                 storedDistanceMeters = d;
+                basePitchDegrees = currentPitchDegrees; // Grava o ângulo do chão
                 heightStep = 2;
-                actionBtn.innerText = "2º Passo: Medir Topo";
+                
+                actionBtn.innerText = "2º Passo: Medir Topo (Resetar)";
                 actionBtn.style.backgroundColor = "#ffc107";
                 actionBtn.style.color = "#000";
                 resultDisplay.innerText = "Mire no TOPO do objeto";
-                subInfo.innerText = `Base salva: ${d.toFixed(2)}m. Incline para cima!`;
+                subInfo.innerText = `Base salva (${d.toFixed(2)}m). Erga o celular para medir!`;
             } else {
-                // Ao clicar novamente na etapa 2, resetamos perfeitamente o estado
                 resetHeightState();
             }
         }
