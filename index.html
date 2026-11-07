@@ -3,175 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trena Virtual Pro - Com Animação Geométrica</title>
+    <title>Trena Virtual Pro - Calibração Absoluta</title>
     <style>
-        /* 1. ESTILOS BASE E LAYOUT */
+        /* ESTILOS BASE */
         body {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
+            margin: 0; padding: 0; overflow: hidden;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background-color: #000;
         }
 
         #camera-video {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            object-fit: cover;
-            z-index: 1;
+            position: absolute; top: 0; left: 0;
+            width: 100vw; height: 100vh; object-fit: cover; z-index: 1;
         }
 
-        /* 2. MIRA INTELIGENTE (CROSSHAIR) */
-        :root {
-            --crosshair-color: #ff4d4d;
-        }
-
+        /* MIRA INTELIGENTE */
+        :root { --crosshair-color: #ff4d4d; }
         #crosshair {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 28px;
-            height: 28px;
-            transform: translate(-50%, -50%);
-            border: 2.5px solid var(--crosshair-color);
-            border-radius: 50%;
-            z-index: 5;
-            pointer-events: none;
-            box-shadow: 0 0 8px rgba(0,0,0,0.6);
+            position: absolute; top: 50%; left: 50%;
+            width: 28px; height: 28px; transform: translate(-50%, -50%);
+            border: 2.5px solid var(--crosshair-color); border-radius: 50%;
+            z-index: 5; pointer-events: none; box-shadow: 0 0 8px rgba(0,0,0,0.6);
             transition: border-color 0.3s ease;
         }
-
         #crosshair::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 6px;
-            height: 6px;
-            background: var(--crosshair-color);
-            transform: translate(-50%, -50%);
-            border-radius: 50%;
+            content: ''; position: absolute; top: 50%; left: 50%;
+            width: 6px; height: 6px; background: var(--crosshair-color);
+            transform: translate(-50%, -50%); border-radius: 50%;
             transition: background 0.3s ease;
         }
 
-        /* 3. VISUALIZADOR GEOMÉTRICO (TRIÂNGULO ANIMADO) */
+        /* VISUALIZADOR 2D */
         #visualizer-container {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            background: rgba(20, 20, 20, 0.7);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            border-radius: 12px;
-            padding: 10px;
-            z-index: 15;
+            position: absolute; top: 20px; left: 20px;
+            background: rgba(20, 20, 20, 0.7); backdrop-filter: blur(8px);
+            border-radius: 12px; padding: 10px; z-index: 15;
             border: 1px solid rgba(255, 255, 255, 0.1);
-            transition: opacity 0.3s ease;
-            opacity: 0.3; /* Fica meio transparente até medir algo */
+            transition: opacity 0.3s ease; opacity: 0.3;
         }
-
         #visualizer-container span {
-            display: block;
-            color: #aaa;
-            font-size: 10px;
-            text-align: center;
-            margin-bottom: 5px;
-            font-weight: bold;
+            display: block; color: #aaa; font-size: 10px; text-align: center;
+            margin-bottom: 5px; font-weight: bold;
         }
 
-        /* 4. DESIGN PREMIUM DO PAINEL PRINCIPAL */
+        /* PAINEL PRINCIPAL */
         #controls-panel {
-            position: absolute;
-            bottom: 20px; /* Movido para baixo para deixar o topo livre para o triângulo */
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(20, 20, 20, 0.75);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            color: #ffffff;
-            padding: 12px 16px;
-            border-radius: 16px;
-            font-size: 13px;
-            z-index: 10;
-            text-align: center;
-            width: 90%;
-            max-height: 45vh;
-            overflow-y: auto;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(20, 20, 20, 0.85); backdrop-filter: blur(12px);
+            color: #ffffff; padding: 12px 16px; border-radius: 16px;
+            font-size: 13px; z-index: 10; text-align: center; width: 90%;
+            max-height: 45vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.8);
+            border: 1px solid rgba(255, 255, 255, 0.15);
         }
 
-        /* Abas de Modo */
-        .mode-selector {
-            display: flex;
-            justify-content: center;
-            gap: 8px;
-            margin-bottom: 8px;
-        }
-
+        .mode-selector { display: flex; justify-content: center; gap: 8px; margin-bottom: 8px; }
         .mode-btn {
-            background: rgba(255,255,255,0.1);
-            color: #ccc;
-            border: none;
-            padding: 6px 14px;
-            border-radius: 12px;
-            cursor: pointer;
-            font-size: 13px;
-            transition: all 0.2s ease;
+            background: rgba(255,255,255,0.1); color: #ccc; border: none;
+            padding: 6px 14px; border-radius: 12px; cursor: pointer; font-size: 13px;
         }
-
         .mode-btn.active {
-            background: #007aff;
-            color: #fff;
-            font-weight: bold;
-            box-shadow: 0 2px 8px rgba(0, 122, 255, 0.5);
+            background: #007aff; color: #fff; font-weight: bold; box-shadow: 0 2px 8px rgba(0, 122, 255, 0.5);
         }
 
-        .result-title {
-            font-size: 22px;
-            font-weight: 800;
-            color: #fff;
-            margin: 4px 0;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        .result-title { font-size: 24px; font-weight: 900; color: #fff; margin: 4px 0; }
+        
+        /* AVISO DE POSTURA */
+        #posture-warning {
+            font-size: 11px; color: #ff9f0a; font-weight: bold; margin-top: 2px;
+            display: none; /* Só aparece no modo altura */
         }
 
-        .input-group {
-            margin-top: 8px;
-            font-size: 12px;
-            color: #ddd;
-        }
-
+        .input-group { margin-top: 8px; font-size: 12px; color: #ddd; }
         .input-group input {
-            width: 55px;
-            padding: 4px;
-            text-align: center;
-            border-radius: 6px;
-            border: 1px solid #555;
-            background: rgba(0,0,0,0.5);
-            color: #fff;
+            width: 55px; padding: 4px; text-align: center; border-radius: 6px;
+            border: 1px solid #555; background: rgba(0,0,0,0.5); color: #fff; font-weight: bold;
         }
 
-        /* Botões de Ação */
-        .actions-grid {
-            display: flex;
-            justify-content: center;
-            gap: 6px;
-            flex-wrap: wrap;
-            margin-top: 10px;
-        }
-
+        .actions-grid { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
         .btn-action {
-            padding: 8px 12px;
-            font-size: 12px;
-            font-weight: bold;
-            color: #fff;
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: transform 0.1s;
+            padding: 8px 12px; font-size: 12px; font-weight: bold; color: #fff;
+            border: none; border-radius: 12px; cursor: pointer;
         }
         .btn-action:active { transform: scale(0.95); }
 
@@ -180,47 +91,22 @@
         #save-btn { background-color: #ff9f0a; }
         #toggle-history-btn { background-color: #444; }
 
-        /* Histórico */
         #history-section {
-            display: none;
-            margin-top: 12px;
-            border-top: 1px solid rgba(255,255,255,0.2);
-            padding-top: 10px;
-            text-align: left;
+            display: none; margin-top: 12px; border-top: 1px solid rgba(255,255,255,0.2);
+            padding-top: 10px; text-align: left;
         }
-        #history-list {
-            list-style: none;
-            padding: 0;
-            margin: 6px 0;
-            max-height: 120px;
-            overflow-y: auto;
-        }
+        #history-list { list-style: none; padding: 0; margin: 6px 0; max-height: 120px; overflow-y: auto; }
         #history-list li {
-            background: rgba(255, 255, 255, 0.08);
-            padding: 6px 10px;
-            border-radius: 8px;
-            margin-bottom: 4px;
-            font-size: 12px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-left: 3px solid #ff9f0a;
+            background: rgba(255, 255, 255, 0.08); padding: 6px 10px; border-radius: 8px;
+            margin-bottom: 4px; font-size: 12px; display: flex; justify-content: space-between;
+            align-items: center; border-left: 3px solid #ff9f0a;
         }
 
         #permission-btn {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            padding: 16px 32px;
-            font-size: 16px;
-            font-weight: bold;
-            color: #fff;
-            background: linear-gradient(135deg, #007aff, #5e5ce6);
-            border: none;
-            border-radius: 30px;
-            z-index: 20;
-            box-shadow: 0 4px 15px rgba(0, 122, 255, 0.4);
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            padding: 16px 32px; font-size: 16px; font-weight: bold; color: #fff;
+            background: linear-gradient(135deg, #007aff, #5e5ce6); border: none;
+            border-radius: 30px; z-index: 20; box-shadow: 0 4px 15px rgba(0, 122, 255, 0.4);
         }
     </style>
 </head>
@@ -229,41 +115,38 @@
     <video id="camera-video" autoplay playsinline></video>
     <div id="crosshair"></div>
 
-    <!-- NOVO BLOCO: VISUALIZADOR DO TRIÂNGULO EM SVG -->
     <div id="visualizer-container">
-        <span>Animação 2D</span>
+        <span>Visão Lateral</span>
         <svg id="triangle-svg" width="130" height="130">
-            <!-- Polígono que forma o triângulo verde -->
             <polygon id="triangle-polygon" points="10,10 10,110 110,110" fill="rgba(50, 215, 75, 0.2)" stroke="#32d74b" stroke-width="2"/>
-            
-            <!-- Textos dinâmicos nas arestas -->
-            <text id="text-h" x="12" y="60" fill="#fff" font-size="11" transform="rotate(-90 12,60)">1.28m</text>
+            <text id="text-h" x="12" y="60" fill="#fff" font-size="11" transform="rotate(-90 12,60)">1.50m</text>
             <text id="text-d" x="60" y="125" fill="#fff" font-size="11" text-anchor="middle">--m</text>
             <text id="text-ang" x="25" y="25" fill="#ff9f0a" font-size="12" font-weight="bold">--°</text>
         </svg>
     </div>
 
-    <!-- PAINEL DE CONTROLO MOVIDO PARA A BASE DO ECRÃ -->
     <div id="controls-panel">
         <div class="mode-selector">
             <button class="mode-btn active" id="btn-mode-dist" onclick="switchMode('dist')">Distância</button>
-            <button class="mode-btn" id="btn-mode-height" onclick="switchMode('height')">Altura</button>
+            <button class="mode-btn" id="btn-mode-height" onclick="switchMode('height')">Altura Vertical</button>
         </div>
 
-        <div id="result-display" class="result-title">Calibre o sensor</div>
-        <div id="sub-info" style="font-size: 11px; color: #aaa;">Aguardando...</div>
+        <div id="result-display" class="result-title">Calibre o Nível</div>
+        <div id="sub-info" style="font-size: 11px; color: #aaa;">Olhe para frente e calibre</div>
+        <div id="posture-warning">⚠️ Gire APENAS o pulso. Não levante o celular!</div>
         <div id="error-display" style="color: #ff453a; font-size: 11px; margin-top: 2px;"></div>
         
         <div class="input-group">
-            <label for="user-height">Altura da Lente (m): </label>
-            <input type="number" id="user-height" value="1.28" step="0.01" min="0.5" max="2.5">
+            <label for="user-height">Altura Exata da Câmera (m): </label>
+            <!-- Alterado para 1.50m como solicitado no seu teste físico -->
+            <input type="number" id="user-height" value="1.50" step="0.01" min="0.5" max="2.5">
         </div>
 
         <div class="actions-grid">
             <button class="btn-action" id="calibrate-btn" onclick="calibrateHorizon()">🎯 Calibrar</button>
             <button class="btn-action" id="action-btn" onclick="handleAction()">📍 Fixar Base</button>
             <button class="btn-action" id="save-btn" onclick="saveCurrentMeasurement()">💾 Salvar</button>
-            <button class="btn-action" id="toggle-history-btn" onclick="toggleHistory()">📋 Hist</button>
+            <button class="btn-action" id="toggle-history-btn" onclick="toggleHistory()">📋 Histórico</button>
         </div>
 
         <div id="history-section">
@@ -286,16 +169,23 @@
         const calibrateBtn = document.getElementById('calibrate-btn');
         const historySection = document.getElementById('history-section');
         const historyList = document.getElementById('history-list');
+        const postureWarning = document.getElementById('posture-warning');
         const visualizer = document.getElementById('visualizer-container');
         const rootStyles = document.documentElement;
 
         let currentMode = 'dist';
         let heightStep = 1;
+        
+        // Separação de Ângulos: O RAW é usado para botões (precisão), o Suavizado para a tela.
+        let rawPitch = 0; 
         let smoothedPitch = null;
-        const smoothingFactor = 0.15;
+        const smoothingFactor = 0.25; // Aumentado para reagir mais rápido
+        
         let lastCalculatedValue = 0;
         let horizonBeta = 90;
         let isCalibrated = false;
+        
+        // Memória da Altura
         let storedDistanceMeters = 0;
         let savedMeasurements = JSON.parse(localStorage.getItem('trena_history') || '[]');
 
@@ -341,117 +231,114 @@
 
         function handleOrientation(event) {
             if (event.beta !== null) {
-                let rawPitch = event.beta;
+                rawPitch = event.beta;
                 if (smoothedPitch === null) smoothedPitch = rawPitch;
                 else smoothedPitch = smoothedPitch + smoothingFactor * (rawPitch - smoothedPitch);
                 updateCalculations();
             }
         }
 
-        function getElevationDegrees() { return smoothedPitch - horizonBeta; }
+        // Usa o ângulo suavizado para mostrar na tela, mas permite usar o RAW nos cliques
+        function getElevationDegrees(useRaw = false) { 
+            const pitch = useRaw ? rawPitch : smoothedPitch;
+            return pitch - horizonBeta; 
+        }
 
         function calibrateHorizon() {
             triggerHaptic();
-            horizonBeta = smoothedPitch;
+            horizonBeta = rawPitch; // Usa o ângulo exato do milissegundo do clique
             isCalibrated = true;
             calibrateBtn.style.backgroundColor = "#34c759";
             calibrateBtn.innerText = "✓ Calibrado";
             updateCalculations();
         }
 
-        function getBaseDistance() {
+        // LÓGICA TRIGONOMÉTRICA CIRÚRGICA
+        function getBaseDistance(useRaw = false) {
             const h = parseFloat(userHeightInput.value);
-            const elevation = getElevationDegrees();
-            if (!Number.isFinite(h) || h <= 0 || elevation >= -2) return null;
+            const elevation = getElevationDegrees(useRaw);
+            // Se estiver apontado acima da linha do horizonte ou muito perto de zero
+            if (!Number.isFinite(h) || h <= 0 || elevation >= -1.5) return null; 
+            
+            // Cateto Adjacente = Cateto Oposto (h) / tan(ângulo de descida)
             return -h / Math.tan(elevation * (Math.PI / 180));
         }
 
-        function getObjectHeight(distance) {
+        function getObjectHeight() {
             const h = parseFloat(userHeightInput.value);
-            const elevation = getElevationDegrees();
+            const currentElev = getElevationDegrees(false); // Pode ser positivo ou negativo
+            
             if (!Number.isFinite(h) || h <= 0) return 0;
-            return h + (distance * Math.tan(elevation * (Math.PI / 180)));
+
+            // A altura da lente (h) representa o cateto exato abaixo do horizonte.
+            // A altura do topo a partir da linha do horizonte é: Distância * tan(elevação do topo)
+            const heightFromHorizon = storedDistanceMeters * Math.tan(currentElev * (Math.PI / 180));
+            
+            const totalHeight = h + heightFromHorizon;
+            return totalHeight > 0 ? totalHeight : 0;
         }
 
         function setCrosshairColor(isValid) {
             rootStyles.style.setProperty('--crosshair-color', isValid ? '#32d74b' : '#ff453a');
         }
 
-        // --- NOVA FUNÇÃO: DESENHAR O TRIÂNGULO ANIMADO ---
         function drawTriangle(distance, cameraHeight, angle) {
             if (!distance || distance <= 0) {
-                visualizer.style.opacity = '0.3';
-                return;
+                visualizer.style.opacity = '0.3'; return;
             }
             visualizer.style.opacity = '1';
-
-            const maxPx = 100; // Tamanho máximo que o desenho pode ocupar no SVG
+            const maxPx = 100; 
             let drawW, drawH;
 
-            // Escala proporcional: O lado maior sempre ocupará 100 píxeis, o menor ajusta-se
             if (distance > cameraHeight) {
-                drawW = maxPx;
-                drawH = maxPx * (cameraHeight / distance);
+                drawW = maxPx; drawH = maxPx * (cameraHeight / distance);
             } else {
-                drawH = maxPx;
-                drawW = maxPx * (distance / cameraHeight);
+                drawH = maxPx; drawW = maxPx * (distance / cameraHeight);
             }
 
-            // O ponto inicial (Câmera) é no topo esquerdo (X:20, Y:15)
-            const p1 = `20,15`; 
-            // O ponto do chão abaixo da câmera
-            const p2 = `20,${15 + drawH}`; 
-            // O alvo medido no chão
-            const p3 = `${20 + drawW},${15 + drawH}`;
-
-            // Atualiza os vértices do polígono SVG
+            const p1 = `20,15`; const p2 = `20,${15 + drawH}`; const p3 = `${20 + drawW},${15 + drawH}`;
             document.getElementById('triangle-polygon').setAttribute('points', `${p1} ${p2} ${p3}`);
 
-            // Atualiza os textos dos valores no SVG
             const textH = document.getElementById('text-h');
             textH.textContent = cameraHeight.toFixed(2) + 'm';
-            textH.setAttribute('transform', `rotate(-90 12,${15 + drawH / 2})`); // Roda o texto verticalmente
+            textH.setAttribute('transform', `rotate(-90 12,${15 + drawH / 2})`);
             textH.setAttribute('y', 15 + drawH / 2);
 
             const textD = document.getElementById('text-d');
             textD.textContent = distance.toFixed(2) + 'm';
-            textD.setAttribute('x', 20 + drawW / 2);
-            textD.setAttribute('y', 15 + drawH + 12);
+            textD.setAttribute('x', 20 + drawW / 2); textD.setAttribute('y', 15 + drawH + 12);
 
             const textAng = document.getElementById('text-ang');
             textAng.textContent = Math.abs(angle).toFixed(1) + '°';
-            textAng.setAttribute('x', 25);
-            textAng.setAttribute('y', 30);
         }
 
         function updateCalculations() {
-            const elevation = getElevationDegrees();
-            const hCam = parseFloat(userHeightInput.value) || 1.28;
+            const elevation = getElevationDegrees(false);
+            const hCam = parseFloat(userHeightInput.value) || 1.50;
 
             if (currentMode === 'dist') {
-                const d = getBaseDistance();
+                const d = getBaseDistance(false);
                 if (d === null) {
                     resultDisplay.innerText = isCalibrated ? "Aponte p/ o chão" : "Calibre o Sensor";
                     subInfo.innerText = `Elevação: ${elevation.toFixed(1)}°`;
                     lastCalculatedValue = 0;
                     setCrosshairColor(false);
-                    drawTriangle(0, hCam, 0); // Apaga triângulo
+                    drawTriangle(0, hCam, 0);
                 } else {
                     lastCalculatedValue = d;
                     resultDisplay.innerText = `${d.toFixed(2)} m`;
                     resultDisplay.style.color = "#32d74b";
                     subInfo.innerText = `Elevação: ${elevation.toFixed(1)}° | ${(d * 100).toFixed(0)} cm`;
                     setCrosshairColor(true);
-                    drawTriangle(d, hCam, elevation); // Anima o triângulo
+                    drawTriangle(d, hCam, elevation);
                 }
             } else if (currentMode === 'height' && heightStep === 2) {
-                const totalHeight = getObjectHeight(storedDistanceMeters);
+                const totalHeight = getObjectHeight();
                 lastCalculatedValue = totalHeight;
                 resultDisplay.innerText = `${totalHeight.toFixed(2)} m`;
                 resultDisplay.style.color = "#0a84ff";
                 subInfo.innerText = `Base: ${storedDistanceMeters.toFixed(2)}m | Elev: ${elevation.toFixed(1)}°`;
                 setCrosshairColor(true);
-                // Para altura, mantemos o triângulo da base para referência de distânica horizontal
                 drawTriangle(storedDistanceMeters, hCam, elevation); 
             }
         }
@@ -465,8 +352,7 @@
         function saveCurrentMeasurement() {
             triggerHaptic();
             if (lastCalculatedValue <= 0) {
-                alert("Mire corretamente antes de salvar.");
-                return;
+                alert("Mire corretamente antes de salvar."); return;
             }
             const label = prompt("Nome da medição:", currentMode === 'dist' ? "Distância" : "Altura");
             if (label === null) return;
@@ -484,8 +370,7 @@
         function renderHistory() {
             historyList.innerHTML = "";
             if (savedMeasurements.length === 0) {
-                historyList.innerHTML = "<li style='color: #888;'>Nenhum registro.</li>";
-                return;
+                historyList.innerHTML = "<li style='color: #888;'>Nenhum registro.</li>"; return;
             }
             savedMeasurements.forEach(item => {
                 const li = document.createElement('li');
@@ -504,9 +389,7 @@
 
         function clearHistory() {
             if (confirm("Apagar todo o histórico?")) {
-                savedMeasurements = [];
-                localStorage.removeItem('trena_history');
-                renderHistory();
+                savedMeasurements = []; localStorage.removeItem('trena_history'); renderHistory();
             }
         }
 
@@ -518,6 +401,7 @@
             
             if (mode === 'dist') {
                 actionBtn.style.display = 'none';
+                postureWarning.style.display = 'none';
                 resultDisplay.style.color = "#32d74b";
                 updateCalculations();
             } else {
@@ -535,17 +419,18 @@
             resultDisplay.innerText = "Mire na BASE";
             resultDisplay.style.color = "#ff453a";
             subInfo.innerText = "Fixe a distância primeiro";
+            postureWarning.style.display = 'none';
             setCrosshairColor(false);
-            drawTriangle(0, 1.28, 0);
+            drawTriangle(0, 1.50, 0);
         }
 
         function handleAction() {
             triggerHaptic();
             if (heightStep === 1) {
-                const d = getBaseDistance();
+                // USA O RAW PITCH AQUI PARA PRECISÃO MÁXIMA NO MOMENTO DO CLIQUE (Ignora o filtro passa-baixa)
+                const d = getBaseDistance(true); 
                 if (d === null) {
-                    alert("Mire no chão primeiro.");
-                    return;
+                    alert("Mire no chão primeiro (abaixo da linha do horizonte)."); return;
                 }
                 storedDistanceMeters = d;
                 heightStep = 2;
@@ -553,6 +438,7 @@
                 actionBtn.style.backgroundColor = "#ff9f0a";
                 resultDisplay.innerText = "Mire no TOPO";
                 subInfo.innerText = `Erga o celular!`;
+                postureWarning.style.display = 'block'; // Mostra aviso para não levantar braços
             } else {
                 resetHeightState();
             }
