@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trena Virtual Pro - Calibrada</title>
+    <title>Trena Virtual Pro - Com Animação Geométrica</title>
     <style>
         /* 1. ESTILOS BASE E LAYOUT */
         body {
             margin: 0;
             padding: 0;
             overflow: hidden;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background-color: #000;
         }
 
@@ -26,7 +26,7 @@
 
         /* 2. MIRA INTELIGENTE (CROSSHAIR) */
         :root {
-            --crosshair-color: #ff4d4d; /* Inicia vermelho */
+            --crosshair-color: #ff4d4d;
         }
 
         #crosshair {
@@ -57,10 +57,35 @@
             transition: background 0.3s ease;
         }
 
-        /* 3. DESIGN PREMIUM DO PAINEL */
+        /* 3. VISUALIZADOR GEOMÉTRICO (TRIÂNGULO ANIMADO) */
+        #visualizer-container {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(20, 20, 20, 0.7);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border-radius: 12px;
+            padding: 10px;
+            z-index: 15;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: opacity 0.3s ease;
+            opacity: 0.3; /* Fica meio transparente até medir algo */
+        }
+
+        #visualizer-container span {
+            display: block;
+            color: #aaa;
+            font-size: 10px;
+            text-align: center;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        /* 4. DESIGN PREMIUM DO PAINEL PRINCIPAL */
         #controls-panel {
             position: absolute;
-            top: 15px;
+            bottom: 20px; /* Movido para baixo para deixar o topo livre para o triângulo */
             left: 50%;
             transform: translateX(-50%);
             background: rgba(20, 20, 20, 0.75);
@@ -105,7 +130,6 @@
             box-shadow: 0 2px 8px rgba(0, 122, 255, 0.5);
         }
 
-        /* Tipografia de Resultados */
         .result-title {
             font-size: 22px;
             font-weight: 800;
@@ -121,7 +145,7 @@
         }
 
         .input-group input {
-            width: 55px; /* Ligeiramente mais largo para acomodar precisão centimétrica */
+            width: 55px;
             padding: 4px;
             text-align: center;
             border-radius: 6px;
@@ -130,7 +154,7 @@
             color: #fff;
         }
 
-        /* Botões de Ação Modernos */
+        /* Botões de Ação */
         .actions-grid {
             display: flex;
             justify-content: center;
@@ -147,9 +171,8 @@
             border: none;
             border-radius: 12px;
             cursor: pointer;
-            transition: transform 0.1s, filter 0.2s;
+            transition: transform 0.1s;
         }
-        
         .btn-action:active { transform: scale(0.95); }
 
         #calibrate-btn { background-color: #5e5ce6; }
@@ -157,7 +180,7 @@
         #save-btn { background-color: #ff9f0a; }
         #toggle-history-btn { background-color: #444; }
 
-        /* Histórico Estilizado */
+        /* Histórico */
         #history-section {
             display: none;
             margin-top: 12px;
@@ -165,7 +188,6 @@
             padding-top: 10px;
             text-align: left;
         }
-
         #history-list {
             list-style: none;
             padding: 0;
@@ -173,7 +195,6 @@
             max-height: 120px;
             overflow-y: auto;
         }
-
         #history-list li {
             background: rgba(255, 255, 255, 0.08);
             padding: 6px 10px;
@@ -186,12 +207,11 @@
             border-left: 3px solid #ff9f0a;
         }
 
-        /* Botão Inicial */
         #permission-btn {
             position: absolute;
-            bottom: 40px;
+            top: 50%;
             left: 50%;
-            transform: translateX(-50%);
+            transform: translate(-50%, -50%);
             padding: 16px 32px;
             font-size: 16px;
             font-weight: bold;
@@ -199,7 +219,7 @@
             background: linear-gradient(135deg, #007aff, #5e5ce6);
             border: none;
             border-radius: 30px;
-            z-index: 10;
+            z-index: 20;
             box-shadow: 0 4px 15px rgba(0, 122, 255, 0.4);
         }
     </style>
@@ -209,6 +229,21 @@
     <video id="camera-video" autoplay playsinline></video>
     <div id="crosshair"></div>
 
+    <!-- NOVO BLOCO: VISUALIZADOR DO TRIÂNGULO EM SVG -->
+    <div id="visualizer-container">
+        <span>Animação 2D</span>
+        <svg id="triangle-svg" width="130" height="130">
+            <!-- Polígono que forma o triângulo verde -->
+            <polygon id="triangle-polygon" points="10,10 10,110 110,110" fill="rgba(50, 215, 75, 0.2)" stroke="#32d74b" stroke-width="2"/>
+            
+            <!-- Textos dinâmicos nas arestas -->
+            <text id="text-h" x="12" y="60" fill="#fff" font-size="11" transform="rotate(-90 12,60)">1.28m</text>
+            <text id="text-d" x="60" y="125" fill="#fff" font-size="11" text-anchor="middle">--m</text>
+            <text id="text-ang" x="25" y="25" fill="#ff9f0a" font-size="12" font-weight="bold">--°</text>
+        </svg>
+    </div>
+
+    <!-- PAINEL DE CONTROLO MOVIDO PARA A BASE DO ECRÃ -->
     <div id="controls-panel">
         <div class="mode-selector">
             <button class="mode-btn active" id="btn-mode-dist" onclick="switchMode('dist')">Distância</button>
@@ -220,9 +255,7 @@
         <div id="error-display" style="color: #ff453a; font-size: 11px; margin-top: 2px;"></div>
         
         <div class="input-group">
-            <label for="user-height">Altura da Lente da Câmera (m): </label>
-            <!-- AQUI ESTÁ A SUA CALIBRAÇÃO EXATA: 1.28 metros -->
-            <!-- Alterado step="0.05" para step="0.01" para permitir precisão milimétrica -->
+            <label for="user-height">Altura da Lente (m): </label>
             <input type="number" id="user-height" value="1.28" step="0.01" min="0.5" max="2.5">
         </div>
 
@@ -230,7 +263,7 @@
             <button class="btn-action" id="calibrate-btn" onclick="calibrateHorizon()">🎯 Calibrar</button>
             <button class="btn-action" id="action-btn" onclick="handleAction()">📍 Fixar Base</button>
             <button class="btn-action" id="save-btn" onclick="saveCurrentMeasurement()">💾 Salvar</button>
-            <button class="btn-action" id="toggle-history-btn" onclick="toggleHistory()">📋 Histórico</button>
+            <button class="btn-action" id="toggle-history-btn" onclick="toggleHistory()">📋 Hist</button>
         </div>
 
         <div id="history-section">
@@ -240,10 +273,9 @@
         </div>
     </div>
 
-    <button id="permission-btn">Ativar Trena Virtual Pro</button>
+    <button id="permission-btn">Ativar Trena Virtual</button>
 
     <script>
-        // --- 1. REFERÊNCIAS VISUAIS ---
         const videoElement = document.getElementById('camera-video');
         const resultDisplay = document.getElementById('result-display');
         const subInfo = document.getElementById('sub-info');
@@ -254,30 +286,21 @@
         const calibrateBtn = document.getElementById('calibrate-btn');
         const historySection = document.getElementById('history-section');
         const historyList = document.getElementById('history-list');
+        const visualizer = document.getElementById('visualizer-container');
         const rootStyles = document.documentElement;
 
-        // --- 2. VARIÁVEIS DE ESTADO E SUAVIZAÇÃO (FILTRO) ---
         let currentMode = 'dist';
         let heightStep = 1;
-        
-        // Filtro Passa-Baixa (Exponential Moving Average)
         let smoothedPitch = null;
         const smoothingFactor = 0.15;
-        
         let lastCalculatedValue = 0;
         let horizonBeta = 90;
         let isCalibrated = false;
         let storedDistanceMeters = 0;
         let savedMeasurements = JSON.parse(localStorage.getItem('trena_history') || '[]');
 
-        // --- 3. FEEDBACK TÁTIL ---
-        function triggerHaptic() {
-            if (navigator.vibrate) {
-                navigator.vibrate(40);
-            }
-        }
+        function triggerHaptic() { if (navigator.vibrate) navigator.vibrate(40); }
 
-        // --- 4. INICIALIZAÇÃO ---
         permissionBtn.addEventListener('click', async () => {
             triggerHaptic();
             errorDisplay.innerText = "";
@@ -316,24 +339,16 @@
             }
         }
 
-        // --- 5. FILTRO MATEMÁTICO DO GIROSCÓPIO ---
         function handleOrientation(event) {
             if (event.beta !== null) {
                 let rawPitch = event.beta;
-                
-                if (smoothedPitch === null) {
-                    smoothedPitch = rawPitch;
-                } else {
-                    smoothedPitch = smoothedPitch + smoothingFactor * (rawPitch - smoothedPitch);
-                }
-                
+                if (smoothedPitch === null) smoothedPitch = rawPitch;
+                else smoothedPitch = smoothedPitch + smoothingFactor * (rawPitch - smoothedPitch);
                 updateCalculations();
             }
         }
 
-        function getElevationDegrees() {
-            return smoothedPitch - horizonBeta;
-        }
+        function getElevationDegrees() { return smoothedPitch - horizonBeta; }
 
         function calibrateHorizon() {
             triggerHaptic();
@@ -344,9 +359,8 @@
             updateCalculations();
         }
 
-        // --- 6. CÁLCULO E COR DA MIRA ---
         function getBaseDistance() {
-            const h = parseFloat(userHeightInput.value); // Lê o valor, agora 1.28 por padrão
+            const h = parseFloat(userHeightInput.value);
             const elevation = getElevationDegrees();
             if (!Number.isFinite(h) || h <= 0 || elevation >= -2) return null;
             return -h / Math.tan(elevation * (Math.PI / 180));
@@ -360,42 +374,88 @@
         }
 
         function setCrosshairColor(isValid) {
-            if (isValid) {
-                rootStyles.style.setProperty('--crosshair-color', '#32d74b');
-            } else {
-                rootStyles.style.setProperty('--crosshair-color', '#ff453a');
+            rootStyles.style.setProperty('--crosshair-color', isValid ? '#32d74b' : '#ff453a');
+        }
+
+        // --- NOVA FUNÇÃO: DESENHAR O TRIÂNGULO ANIMADO ---
+        function drawTriangle(distance, cameraHeight, angle) {
+            if (!distance || distance <= 0) {
+                visualizer.style.opacity = '0.3';
+                return;
             }
+            visualizer.style.opacity = '1';
+
+            const maxPx = 100; // Tamanho máximo que o desenho pode ocupar no SVG
+            let drawW, drawH;
+
+            // Escala proporcional: O lado maior sempre ocupará 100 píxeis, o menor ajusta-se
+            if (distance > cameraHeight) {
+                drawW = maxPx;
+                drawH = maxPx * (cameraHeight / distance);
+            } else {
+                drawH = maxPx;
+                drawW = maxPx * (distance / cameraHeight);
+            }
+
+            // O ponto inicial (Câmera) é no topo esquerdo (X:20, Y:15)
+            const p1 = `20,15`; 
+            // O ponto do chão abaixo da câmera
+            const p2 = `20,${15 + drawH}`; 
+            // O alvo medido no chão
+            const p3 = `${20 + drawW},${15 + drawH}`;
+
+            // Atualiza os vértices do polígono SVG
+            document.getElementById('triangle-polygon').setAttribute('points', `${p1} ${p2} ${p3}`);
+
+            // Atualiza os textos dos valores no SVG
+            const textH = document.getElementById('text-h');
+            textH.textContent = cameraHeight.toFixed(2) + 'm';
+            textH.setAttribute('transform', `rotate(-90 12,${15 + drawH / 2})`); // Roda o texto verticalmente
+            textH.setAttribute('y', 15 + drawH / 2);
+
+            const textD = document.getElementById('text-d');
+            textD.textContent = distance.toFixed(2) + 'm';
+            textD.setAttribute('x', 20 + drawW / 2);
+            textD.setAttribute('y', 15 + drawH + 12);
+
+            const textAng = document.getElementById('text-ang');
+            textAng.textContent = Math.abs(angle).toFixed(1) + '°';
+            textAng.setAttribute('x', 25);
+            textAng.setAttribute('y', 30);
         }
 
         function updateCalculations() {
             const elevation = getElevationDegrees();
-            const subText = `Elevação: ${elevation.toFixed(1)}°`;
+            const hCam = parseFloat(userHeightInput.value) || 1.28;
 
             if (currentMode === 'dist') {
                 const d = getBaseDistance();
                 if (d === null) {
                     resultDisplay.innerText = isCalibrated ? "Aponte p/ o chão" : "Calibre o Sensor";
-                    subInfo.innerText = subText;
+                    subInfo.innerText = `Elevação: ${elevation.toFixed(1)}°`;
                     lastCalculatedValue = 0;
                     setCrosshairColor(false);
+                    drawTriangle(0, hCam, 0); // Apaga triângulo
                 } else {
                     lastCalculatedValue = d;
                     resultDisplay.innerText = `${d.toFixed(2)} m`;
                     resultDisplay.style.color = "#32d74b";
-                    subInfo.innerText = `${subText} | ${(d * 100).toFixed(0)} cm`;
+                    subInfo.innerText = `Elevação: ${elevation.toFixed(1)}° | ${(d * 100).toFixed(0)} cm`;
                     setCrosshairColor(true);
+                    drawTriangle(d, hCam, elevation); // Anima o triângulo
                 }
             } else if (currentMode === 'height' && heightStep === 2) {
                 const totalHeight = getObjectHeight(storedDistanceMeters);
                 lastCalculatedValue = totalHeight;
                 resultDisplay.innerText = `${totalHeight.toFixed(2)} m`;
                 resultDisplay.style.color = "#0a84ff";
-                subInfo.innerText = `Base: ${storedDistanceMeters.toFixed(2)}m | ${subText}`;
+                subInfo.innerText = `Base: ${storedDistanceMeters.toFixed(2)}m | Elev: ${elevation.toFixed(1)}°`;
                 setCrosshairColor(true);
+                // Para altura, mantemos o triângulo da base para referência de distânica horizontal
+                drawTriangle(storedDistanceMeters, hCam, elevation); 
             }
         }
 
-        // --- 7. HISTÓRICO E MÁQUINA DE ESTADOS ---
         function toggleHistory() {
             triggerHaptic();
             const isHidden = historySection.style.display === 'none' || historySection.style.display === '';
@@ -476,6 +536,7 @@
             resultDisplay.style.color = "#ff453a";
             subInfo.innerText = "Fixe a distância primeiro";
             setCrosshairColor(false);
+            drawTriangle(0, 1.28, 0);
         }
 
         function handleAction() {
