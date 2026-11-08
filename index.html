@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trena Virtual Pro - Calibração Absoluta</title>
+    <title>Trena Virtual Pro - Altura Inteligente</title>
     <style>
-        /* ESTILOS BASE */
+        /* 1. ESTILOS BASE E LAYOUT */
         body {
             margin: 0; padding: 0; overflow: hidden;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -17,7 +17,7 @@
             width: 100vw; height: 100vh; object-fit: cover; z-index: 1;
         }
 
-        /* MIRA INTELIGENTE */
+        /* 2. MIRA INTELIGENTE */
         :root { --crosshair-color: #ff4d4d; }
         #crosshair {
             position: absolute; top: 50%; left: 50%;
@@ -33,7 +33,7 @@
             transition: background 0.3s ease;
         }
 
-        /* VISUALIZADOR 2D */
+        /* 3. VISUALIZADOR 2D (TRIÂNGULO ANIMADO) */
         #visualizer-container {
             position: absolute; top: 20px; left: 20px;
             background: rgba(20, 20, 20, 0.7); backdrop-filter: blur(8px);
@@ -46,7 +46,7 @@
             margin-bottom: 5px; font-weight: bold;
         }
 
-        /* PAINEL PRINCIPAL */
+        /* 4. PAINEL PRINCIPAL */
         #controls-panel {
             position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
             background: rgba(20, 20, 20, 0.85); backdrop-filter: blur(12px);
@@ -67,10 +67,8 @@
 
         .result-title { font-size: 24px; font-weight: 900; color: #fff; margin: 4px 0; }
         
-        /* AVISO DE POSTURA */
         #posture-warning {
-            font-size: 11px; color: #ff9f0a; font-weight: bold; margin-top: 2px;
-            display: none; /* Só aparece no modo altura */
+            font-size: 11px; color: #ff9f0a; font-weight: bold; margin-top: 2px; display: none;
         }
 
         .input-group { margin-top: 8px; font-size: 12px; color: #ddd; }
@@ -82,7 +80,7 @@
         .actions-grid { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
         .btn-action {
             padding: 8px 12px; font-size: 12px; font-weight: bold; color: #fff;
-            border: none; border-radius: 12px; cursor: pointer;
+            border: none; border-radius: 12px; cursor: pointer; transition: transform 0.1s;
         }
         .btn-action:active { transform: scale(0.95); }
 
@@ -119,7 +117,7 @@
         <span>Visão Lateral</span>
         <svg id="triangle-svg" width="130" height="130">
             <polygon id="triangle-polygon" points="10,10 10,110 110,110" fill="rgba(50, 215, 75, 0.2)" stroke="#32d74b" stroke-width="2"/>
-            <text id="text-h" x="12" y="60" fill="#fff" font-size="11" transform="rotate(-90 12,60)">1.50m</text>
+            <text id="text-h" x="12" y="60" fill="#fff" font-size="11" transform="rotate(-90 12,60)">1.35m</text>
             <text id="text-d" x="60" y="125" fill="#fff" font-size="11" text-anchor="middle">--m</text>
             <text id="text-ang" x="25" y="25" fill="#ff9f0a" font-size="12" font-weight="bold">--°</text>
         </svg>
@@ -138,8 +136,8 @@
         
         <div class="input-group">
             <label for="user-height">Altura Exata da Câmera (m): </label>
-            <!-- Alterado para 1.50m como solicitado no seu teste físico -->
-            <input type="number" id="user-height" value="1.50" step="0.01" min="0.5" max="2.5">
+            <!-- O valor default base agora é 1.35 -->
+            <input type="number" id="user-height" value="1.35" step="0.01" min="0.5" max="2.5">
         </div>
 
         <div class="actions-grid">
@@ -176,18 +174,28 @@
         let currentMode = 'dist';
         let heightStep = 1;
         
-        // Separação de Ângulos: O RAW é usado para botões (precisão), o Suavizado para a tela.
         let rawPitch = 0; 
         let smoothedPitch = null;
-        const smoothingFactor = 0.25; // Aumentado para reagir mais rápido
+        const smoothingFactor = 0.25; 
         
         let lastCalculatedValue = 0;
         let horizonBeta = 90;
         let isCalibrated = false;
         
-        // Memória da Altura
         let storedDistanceMeters = 0;
         let savedMeasurements = JSON.parse(localStorage.getItem('trena_history') || '[]');
+
+        // --- NOVA LÓGICA: CARREGAR ALTURA SALVA (SE EXISTIR) ---
+        const savedCameraHeight = localStorage.getItem('trena_camera_height');
+        if (savedCameraHeight) {
+            userHeightInput.value = savedCameraHeight; // Recupera o valor salvo (ex: 1.35)
+        }
+
+        // Salvar a altura sempre que o usuário alterar o input
+        userHeightInput.addEventListener('input', () => {
+            localStorage.setItem('trena_camera_height', userHeightInput.value);
+            updateCalculations();
+        });
 
         function triggerHaptic() { if (navigator.vibrate) navigator.vibrate(40); }
 
@@ -238,7 +246,6 @@
             }
         }
 
-        // Usa o ângulo suavizado para mostrar na tela, mas permite usar o RAW nos cliques
         function getElevationDegrees(useRaw = false) { 
             const pitch = useRaw ? rawPitch : smoothedPitch;
             return pitch - horizonBeta; 
@@ -246,34 +253,25 @@
 
         function calibrateHorizon() {
             triggerHaptic();
-            horizonBeta = rawPitch; // Usa o ângulo exato do milissegundo do clique
+            horizonBeta = rawPitch; 
             isCalibrated = true;
             calibrateBtn.style.backgroundColor = "#34c759";
             calibrateBtn.innerText = "✓ Calibrado";
             updateCalculations();
         }
 
-        // LÓGICA TRIGONOMÉTRICA CIRÚRGICA
         function getBaseDistance(useRaw = false) {
             const h = parseFloat(userHeightInput.value);
             const elevation = getElevationDegrees(useRaw);
-            // Se estiver apontado acima da linha do horizonte ou muito perto de zero
             if (!Number.isFinite(h) || h <= 0 || elevation >= -1.5) return null; 
-            
-            // Cateto Adjacente = Cateto Oposto (h) / tan(ângulo de descida)
             return -h / Math.tan(elevation * (Math.PI / 180));
         }
 
         function getObjectHeight() {
             const h = parseFloat(userHeightInput.value);
-            const currentElev = getElevationDegrees(false); // Pode ser positivo ou negativo
-            
+            const currentElev = getElevationDegrees(false); 
             if (!Number.isFinite(h) || h <= 0) return 0;
-
-            // A altura da lente (h) representa o cateto exato abaixo do horizonte.
-            // A altura do topo a partir da linha do horizonte é: Distância * tan(elevação do topo)
             const heightFromHorizon = storedDistanceMeters * Math.tan(currentElev * (Math.PI / 180));
-            
             const totalHeight = h + heightFromHorizon;
             return totalHeight > 0 ? totalHeight : 0;
         }
@@ -314,7 +312,7 @@
 
         function updateCalculations() {
             const elevation = getElevationDegrees(false);
-            const hCam = parseFloat(userHeightInput.value) || 1.50;
+            const hCam = parseFloat(userHeightInput.value) || 1.35; // Default de segurança 1.35
 
             if (currentMode === 'dist') {
                 const d = getBaseDistance(false);
@@ -410,6 +408,7 @@
         }
 
         function resetHeightState() {
+            const hCam = parseFloat(userHeightInput.value) || 1.35;
             heightStep = 1;
             storedDistanceMeters = 0;
             actionBtn.style.display = 'inline-block';
@@ -421,13 +420,12 @@
             subInfo.innerText = "Fixe a distância primeiro";
             postureWarning.style.display = 'none';
             setCrosshairColor(false);
-            drawTriangle(0, 1.50, 0);
+            drawTriangle(0, hCam, 0);
         }
 
         function handleAction() {
             triggerHaptic();
             if (heightStep === 1) {
-                // USA O RAW PITCH AQUI PARA PRECISÃO MÁXIMA NO MOMENTO DO CLIQUE (Ignora o filtro passa-baixa)
                 const d = getBaseDistance(true); 
                 if (d === null) {
                     alert("Mire no chão primeiro (abaixo da linha do horizonte)."); return;
@@ -438,13 +436,11 @@
                 actionBtn.style.backgroundColor = "#ff9f0a";
                 resultDisplay.innerText = "Mire no TOPO";
                 subInfo.innerText = `Erga o celular!`;
-                postureWarning.style.display = 'block'; // Mostra aviso para não levantar braços
+                postureWarning.style.display = 'block'; 
             } else {
                 resetHeightState();
             }
         }
-
-        userHeightInput.addEventListener('input', updateCalculations);
     </script>
 </body>
 </html>
