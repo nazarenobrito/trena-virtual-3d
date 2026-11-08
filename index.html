@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trena Virtual Pro - Altura Dinâmica Contínua</title>
+    <title>Trena Virtual Pro - Altura Inercial ZUPT</title>
     <style>
         /* ESTILOS BASE */
         body { margin: 0; padding: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #000; }
@@ -31,7 +31,6 @@
         
         .dynamic-btn { background: #8e8e93; color: white; border: none; border-radius: 6px; padding: 5px 10px; font-size: 11px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
         .dynamic-btn.active { background: #ff3b30; animation: pulse 1.5s infinite; }
-        
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
 
         .actions-grid { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
@@ -116,12 +115,15 @@
         let storedDistanceMeters = 0;
         let lastCalculatedValue = 0;
 
-        // VARIÁVEIS DA ALTURA DINÂMICA CONTÍNUA
+        // --- VARIÁVEIS MELHORADAS DO ZUPT (Zero Velocity Update) ---
         let isDynamicHeightOn = false;
         let currentVelocity = 0;
-        let currentDisplacement = parseFloat(userHeightInput.value) - OFFSET_FISICO; // Inicia com o valor do input
+        let currentDisplacement = parseFloat(userHeightInput.value) - OFFSET_FISICO; 
         let lastTime = 0;
-        let accelNoiseGate = 0.35; // Barreira contra pequenos tremores da mão
+        
+        // Aumentámos a barreira de ruído para 0.6 m/s² (ignora tremores menores)
+        const ACCEL_NOISE_GATE = 0.6; 
+        let stillnessFrames = 0; // Contador de frames parados
 
         function updatePhysicalInstruction() {
             const calcHeight = parseFloat(userHeightInput.value) || 1.50;
@@ -133,7 +135,6 @@
         if (savedCameraHeight) userHeightInput.value = savedCameraHeight; 
         updatePhysicalInstruction();
 
-        // Se alterar manualmente, guarda
         userHeightInput.addEventListener('input', () => {
             localStorage.setItem('trena_camera_height', userHeightInput.value);
             currentDisplacement = parseFloat(userHeightInput.value) - OFFSET_FISICO;
@@ -172,7 +173,7 @@
             }
         }
 
-        // --- LÓGICA DO RASTREIO CONTÍNUO ---
+        // --- LÓGICA DO RASTREIO CONTÍNUO (MELHORADA COM ZUPT) ---
         function toggleDynamicHeight() {
             if (navigator.vibrate) navigator.vibrate(40);
             isDynamicHeightOn = !isDynamicHeightOn;
@@ -183,7 +184,7 @@
                 zeroFloorBtn.style.display = 'inline-block';
                 lastTime = performance.now();
                 currentVelocity = 0;
-                // Sincroniza a posição atual com a caixa de texto
+                stillnessFrames = 0;
                 currentDisplacement = parseFloat(userHeightInput.value) - OFFSET_FISICO;
                 if(currentDisplacement < 0) currentDisplacement = 0;
             } else {
@@ -195,7 +196,7 @@
 
         function zeroFloor() {
             if (navigator.vibrate) navigator.vibrate(40);
-            currentDisplacement = 0; // O telemóvel está no chão (Altura Real = 0)
+            currentDisplacement = 0; 
             currentVelocity = 0;
             updateUIFromDynamicHeight();
         }
@@ -208,23 +209,34 @@
             const accZ = event.acceleration.z || 0;
             
             let magnitude = Math.sqrt(accX*accX + accY*accY + accZ*accZ);
+            
+            // Assumimos que a maior aceleração se dá no eixo Y (cima/baixo no ecrã) ou Z (profundidade)
             let linearAcc = (accY > 0 || accZ > 0) ? magnitude : -magnitude;
 
-            // Filtro de Fricção (Leaky Integrator): Se parou de acelerar, zera a velocidade rapidamente para não flutuar infinito
-            if (Math.abs(linearAcc) < accelNoiseGate) {
+            // ALGORITMO ZUPT (Zero Velocity Update)
+            if (Math.abs(linearAcc) < ACCEL_NOISE_GATE) {
+                stillnessFrames++;
                 linearAcc = 0;
-                currentVelocity *= 0.85; // Fricção forte
-                if(Math.abs(currentVelocity) < 0.05) currentVelocity = 0;
+                // Se o telemóvel estiver "parado" por 3 frames seguidos, força a velocidade a ZERO absoluto
+                if (stillnessFrames > 3) {
+                    currentVelocity = 0; 
+                } else {
+                    currentVelocity *= 0.5; // Fricção extrema antes de parar
+                }
+            } else {
+                stillnessFrames = 0; // O telemóvel está em movimento forte
             }
 
             const currentTime = performance.now();
             if (lastTime !== 0) {
-                const dt = (currentTime - lastTime) / 1000; 
+                let dt = (currentTime - lastTime) / 1000; 
+                // Trava de segurança: Se o browser encravar, não calcula saltos gigantes (máx 0.1s por frame)
+                if (dt > 0.1) dt = 0.1; 
 
+                // Integração Rigorosa
                 currentVelocity += linearAcc * dt;
                 currentDisplacement += currentVelocity * dt;
 
-                // Não deixa a altura ficar negativa (abaixo do chão)
                 if(currentDisplacement < 0) {
                     currentDisplacement = 0;
                     currentVelocity = 0;
@@ -235,19 +247,13 @@
             lastTime = currentTime;
         }
 
-        // Atualiza o input e o triângulo em tempo real!
         function updateUIFromDynamicHeight() {
             let alturaMatematicaCalculada = currentDisplacement + OFFSET_FISICO;
-            
-            // Atualiza o Input Visual
             userHeightInput.value = alturaMatematicaCalculada.toFixed(2);
-            
-            // Atualiza os textos
             updatePhysicalInstruction();
-            
-            // Atualiza toda a matemática e animação do ecrã instantaneamente
             updateCalculations();
         }
+
         // --- FIM DA LÓGICA DE RASTREIO CONTÍNUO ---
 
         function handleOrientation(event) {
@@ -255,7 +261,7 @@
                 rawPitch = event.beta;
                 if (smoothedPitch === null) smoothedPitch = rawPitch;
                 else smoothedPitch = smoothedPitch + 0.25 * (rawPitch - smoothedPitch);
-                updateCalculations(); // Sempre que inclinar a mão, recalcula!
+                updateCalculations();
             }
         }
 
@@ -265,7 +271,7 @@
         }
 
         function getBaseDistance() {
-            const h = parseFloat(userHeightInput.value); // Pega a altura que agora é dinâmica!
+            const h = parseFloat(userHeightInput.value); 
             const elevation = smoothedPitch - horizonBeta;
             if (!Number.isFinite(h) || h <= 0 || elevation >= -1.5) return null; 
             return -h / Math.tan(elevation * (Math.PI / 180));
@@ -320,7 +326,6 @@
 
         function saveCurrentMeasurement() {
             if (navigator.vibrate) navigator.vibrate(40);
-            // Lógica simples de salvar
             let hist = JSON.parse(localStorage.getItem('trena_history') || '[]');
             hist.push({ id: Date.now(), label: "Medida", value: lastCalculatedValue.toFixed(2) });
             localStorage.setItem('trena_history', JSON.stringify(hist));
