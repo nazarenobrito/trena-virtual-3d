@@ -3,51 +3,103 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trena Virtual Pro - Altura Dinâmica Corrigida</title>
+    <title>Trena Virtual Pro - Auto-Altura</title>
     <style>
-        /* ESTILOS BASE E LAYOUT */
-        body { margin: 0; padding: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #000; }
-        #camera-video { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; object-fit: cover; z-index: 1; }
+        /* 1. ESTILOS BASE E LAYOUT */
+        body {
+            margin: 0; padding: 0; overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #000;
+        }
 
-        /* MIRA INTELIGENTE */
+        #camera-video {
+            position: absolute; top: 0; left: 0;
+            width: 100vw; height: 100vh; object-fit: cover; z-index: 1;
+        }
+
+        /* 2. MIRA INTELIGENTE */
         :root { --crosshair-color: #ff4d4d; }
-        #crosshair { position: absolute; top: 50%; left: 50%; width: 28px; height: 28px; transform: translate(-50%, -50%); border: 2.5px solid var(--crosshair-color); border-radius: 50%; z-index: 5; pointer-events: none; box-shadow: 0 0 8px rgba(0,0,0,0.6); transition: border-color 0.3s ease; }
-        #crosshair::after { content: ''; position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; background: var(--crosshair-color); transform: translate(-50%, -50%); border-radius: 50%; }
+        #crosshair {
+            position: absolute; top: 50%; left: 50%;
+            width: 28px; height: 28px; transform: translate(-50%, -50%);
+            border: 2.5px solid var(--crosshair-color); border-radius: 50%;
+            z-index: 5; pointer-events: none; box-shadow: 0 0 8px rgba(0,0,0,0.6);
+            transition: border-color 0.3s ease;
+        }
+        #crosshair::after {
+            content: ''; position: absolute; top: 50%; left: 50%;
+            width: 6px; height: 6px; background: var(--crosshair-color);
+            transform: translate(-50%, -50%); border-radius: 50%;
+        }
 
-        /* VISUALIZADOR 2D SVG */
-        #visualizer-container { position: absolute; top: 20px; left: 20px; background: rgba(20, 20, 20, 0.7); backdrop-filter: blur(8px); border-radius: 12px; padding: 10px; z-index: 15; border: 1px solid rgba(255, 255, 255, 0.1); opacity: 0.3; transition: opacity 0.3s ease; }
-        #visualizer-container span { display: block; color: #aaa; font-size: 10px; text-align: center; margin-bottom: 5px; font-weight: bold; }
+        /* 3. VISUALIZADOR 2D */
+        #visualizer-container {
+            position: absolute; top: 20px; left: 20px;
+            background: rgba(20, 20, 20, 0.7); backdrop-filter: blur(8px);
+            border-radius: 12px; padding: 10px; z-index: 15;
+            border: 1px solid rgba(255, 255, 255, 0.1); opacity: 0.3;
+        }
+        #visualizer-container span {
+            display: block; color: #aaa; font-size: 10px; text-align: center;
+            margin-bottom: 5px; font-weight: bold;
+        }
 
-        /* PAINEL PRINCIPAL */
-        #controls-panel { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(20, 20, 20, 0.85); backdrop-filter: blur(12px); color: #ffffff; padding: 12px 16px; border-radius: 16px; font-size: 13px; z-index: 10; text-align: center; width: 90%; max-height: 55vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.8); border: 1px solid rgba(255, 255, 255, 0.15); }
+        /* 4. PAINEL PRINCIPAL */
+        #controls-panel {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(20, 20, 20, 0.85); backdrop-filter: blur(12px);
+            color: #ffffff; padding: 12px 16px; border-radius: 16px;
+            font-size: 13px; z-index: 10; text-align: center; width: 90%;
+            max-height: 55vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.8);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
         .mode-selector { display: flex; justify-content: center; gap: 8px; margin-bottom: 8px; }
-        .mode-btn { background: rgba(255,255,255,0.1); color: #ccc; border: none; padding: 6px 14px; border-radius: 12px; cursor: pointer; font-size: 13px; }
-        .mode-btn.active { background: #007aff; color: #fff; font-weight: bold; }
+        .mode-btn {
+            background: rgba(255,255,255,0.1); color: #ccc; border: none;
+            padding: 6px 14px; border-radius: 12px; cursor: pointer; font-size: 13px;
+        }
+        .mode-btn.active {
+            background: #007aff; color: #fff; font-weight: bold;
+        }
+
         .result-title { font-size: 24px; font-weight: 900; color: #fff; margin: 4px 0; }
         
-        /* CONTROLES DE ALTURA DINÂMICA */
-        .input-group { margin-top: 8px; font-size: 12px; color: #ddd; display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
-        .input-group input { width: 55px; padding: 4px; text-align: center; border-radius: 6px; border: 1px solid #555; background: rgba(0,0,0,0.5); color: #fff; font-weight: bold; }
-        
-        .dynamic-btn { background: #8e8e93; color: white; border: none; border-radius: 6px; padding: 5px 10px; font-size: 11px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
-        .dynamic-btn.active { background: #ff3b30; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+        .input-group { margin-top: 8px; font-size: 12px; color: #ddd; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .input-group input {
+            width: 55px; padding: 4px; text-align: center; border-radius: 6px;
+            border: 1px solid #555; background: rgba(0,0,0,0.5); color: #fff; font-weight: bold;
+        }
 
-        /* AVISO DE CALIBRAÇÃO */
-        #calibrating-warning { display: none; margin-top: 8px; font-size: 12px; color: #32d74b; font-weight: bold; background: rgba(50, 215, 75, 0.2); padding: 6px; border-radius: 6px; }
+        /* Botão para ativar o cálculo automático da altura */
+        #auto-height-btn {
+            background: #8e8e93; color: white; border: none; border-radius: 6px;
+            padding: 4px 8px; font-size: 11px; cursor: pointer; font-weight: bold;
+        }
+
+        /* Overlay de Instrução para Auto-Altura */
+        #auto-height-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0, 0, 0, 0.85); z-index: 100; color: white;
+            flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px;
+        }
 
         .actions-grid { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
-        .btn-action { padding: 8px 12px; font-size: 12px; font-weight: bold; color: #fff; border: none; border-radius: 12px; cursor: pointer; }
+        .btn-action {
+            padding: 8px 12px; font-size: 12px; font-weight: bold; color: #fff;
+            border: none; border-radius: 12px; cursor: pointer;
+        }
+
         #calibrate-btn { background-color: #5e5ce6; }
         #action-btn { background-color: #34c759; display: none; }
         #save-btn { background-color: #ff9f0a; }
 
-        /* HISTÓRICO */
-        #history-section { display: none; margin-top: 12px; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px; text-align: left; }
-        #history-list { list-style: none; padding: 0; margin: 6px 0; max-height: 120px; overflow-y: auto; }
-        #history-list li { background: rgba(255, 255, 255, 0.08); padding: 6px 10px; border-radius: 8px; margin-bottom: 4px; font-size: 12px; display: flex; justify-content: space-between; align-items: center; border-left: 3px solid #ff9f0a; }
-
-        #permission-btn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 16px 32px; font-size: 16px; font-weight: bold; color: #fff; background: linear-gradient(135deg, #007aff, #5e5ce6); border: none; border-radius: 30px; z-index: 20; }
+        #permission-btn {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            padding: 16px 32px; font-size: 16px; font-weight: bold; color: #fff;
+            background: linear-gradient(135deg, #007aff, #5e5ce6); border: none;
+            border-radius: 30px; z-index: 20;
+        }
     </style>
 </head>
 <body>
@@ -65,6 +117,14 @@
         </svg>
     </div>
 
+    <!-- OVERLAY DO MODO AUTO-ALTURA -->
+    <div id="auto-height-overlay">
+        <h2>Modo Auto-Altura</h2>
+        <p id="auto-height-instructions" style="font-size: 16px; margin: 20px 0;">1. Coloque o telemóvel no chão (virado para cima).<br>2. Clica em "Iniciar" e levanta-o até à altura dos teus olhos.</p>
+        <h1 id="live-height-display" style="color: #32d74b; font-size: 48px; margin: 10px 0;">0.00m</h1>
+        <button class="btn-action" id="start-auto-btn" style="background: #34c759; padding: 12px 24px; font-size: 16px; margin-top: 20px;" onclick="startAutoHeight()">Iniciar Medição</button>
+    </div>
+
     <div id="controls-panel">
         <div class="mode-selector">
             <button class="mode-btn active" id="btn-mode-dist" onclick="switchMode('dist')">Distância</button>
@@ -73,30 +133,23 @@
 
         <div id="result-display" class="result-title">Calibre o Nível</div>
         <div id="sub-info" style="font-size: 11px; color: #aaa;">Olhe para frente e calibre</div>
+        <div id="error-display" style="color: #ff453a; font-size: 11px; margin-top: 2px;"></div>
         
         <div class="input-group">
             <label for="user-height">Altura Calc (m): </label>
-            <input type="number" id="user-height" value="1.50" step="0.01" min="0.0" max="5.0">
-            <button id="dynamic-toggle-btn" class="dynamic-btn" onclick="toggleDynamicHeight()">Rastreio: OFF</button>
-            <button id="zero-floor-btn" class="dynamic-btn" style="background:#34c759; display:none;" onclick="startCalibration()">📍 Zerar Chão</button>
+            <input type="number" id="user-height" value="1.50" step="0.01" min="0.1" max="2.5">
+            <!-- NOVO BOTÃO PARA A AUTO-ALTURA -->
+            <button id="auto-height-btn" onclick="openAutoHeight()">Auto-Altura</button>
         </div>
 
-        <div id="calibrating-warning">A calibrar sensor... NÃO MOVA O TELEMÓVEL!</div>
-
         <div style="margin-top: 6px; font-size: 12px; color: #ffcc00;">
-            Câmera física a: <strong id="real-height-val">1.32</strong><strong>m</strong>
+            Segure a exatos: <strong id="real-height-val">1.32</strong><strong>m</strong>
         </div>
 
         <div class="actions-grid">
-            <button class="btn-action" id="calibrate-btn" onclick="calibrateHorizon()">🎯 Calibrar Nível</button>
+            <button class="btn-action" id="calibrate-btn" onclick="calibrateHorizon()">🎯 Calibrar</button>
             <button class="btn-action" id="action-btn" onclick="handleAction()">📍 Fixar Base</button>
-            <button class="btn-action" id="save-btn" onclick="saveCurrentMeasurement()">💾 Salvar Medida</button>
-        </div>
-
-        <div id="history-section">
-            <strong style="font-size: 12px; color: #ddd;">Medições Salvas</strong>
-            <ul id="history-list"></ul>
-            <button class="btn-action" style="background: #ff3b30; font-size: 10px; padding: 4px 8px;" onclick="clearHistory()">Apagar Tudo</button>
+            <button class="btn-action" id="save-btn" onclick="saveCurrentMeasurement()">💾 Salvar</button>
         </div>
     </div>
 
@@ -108,29 +161,19 @@
         const subInfo = document.getElementById('sub-info');
         const userHeightInput = document.getElementById('user-height');
         const permissionBtn = document.getElementById('permission-btn');
-        const dynamicToggleBtn = document.getElementById('dynamic-toggle-btn');
-        const zeroFloorBtn = document.getElementById('zero-floor-btn');
-        const calibratingWarning = document.getElementById('calibrating-warning');
         const rootStyles = document.documentElement;
 
         const OFFSET_FISICO = 0.18;
         let currentMode = 'dist', heightStep = 1;
         let rawPitch = 0, smoothedPitch = null, horizonBeta = 90;
         let storedDistanceMeters = 0;
-        let lastCalculatedValue = 0;
 
-        // CONFIGURAÇÃO FÍSICA PARA CORRIGIR A DIREÇÃO DO MOVIMENTO
-        const INVERTER_MOVIMENTO = true; 
-
-        let isDynamicHeightOn = false;
+        // VARIÁVEIS DA AUTO-ALTURA (Dupla Integração)
+        let isTrackingHeight = false;
         let currentVelocity = 0;
-        let currentDisplacement = parseFloat(userHeightInput.value) - OFFSET_FISICO; 
+        let currentDisplacement = 0;
         let lastTime = 0;
-        
-        let isCalibrating = false;
-        let calibrationSamples = [];
-        let sensorBias = 0; 
-        const ACCEL_NOISE_GATE = 0.08; 
+        let accelNoiseGate = 0.4; // Só regista movimento se a aceleração for maior que 0.4 m/s² (Ignora tremores)
 
         function updatePhysicalInstruction() {
             const calcHeight = parseFloat(userHeightInput.value) || 1.50;
@@ -144,12 +187,10 @@
 
         userHeightInput.addEventListener('input', () => {
             localStorage.setItem('trena_camera_height', userHeightInput.value);
-            currentDisplacement = parseFloat(userHeightInput.value) - OFFSET_FISICO;
             updatePhysicalInstruction(); updateCalculations();
         });
 
         permissionBtn.addEventListener('click', async () => {
-            if (navigator.vibrate) navigator.vibrate(40);
             const camOk = await startCamera();
             const sensorOk = await requestOrientationPermission();
             if (camOk && sensorOk) {
@@ -169,6 +210,8 @@
                 try {
                     await DeviceOrientationEvent.requestPermission();
                     window.addEventListener('deviceorientation', handleOrientation);
+                    
+                    // Adicionamos também a permissão para os movimentos lineares (Acelerômetro)
                     await DeviceMotionEvent.requestPermission();
                     window.addEventListener('devicemotion', handleMotion);
                     return true;
@@ -180,102 +223,87 @@
             }
         }
 
-        function toggleDynamicHeight() {
-            if (navigator.vibrate) navigator.vibrate(40);
-            isDynamicHeightOn = !isDynamicHeightOn;
-            
-            if (isDynamicHeightOn) {
-                dynamicToggleBtn.innerText = "Rastreio: ON";
-                dynamicToggleBtn.classList.add('active');
-                zeroFloorBtn.style.display = 'inline-block';
-                lastTime = performance.now();
-                currentVelocity = 0;
-                currentDisplacement = parseFloat(userHeightInput.value) - OFFSET_FISICO;
-                if(currentDisplacement < 0) currentDisplacement = 0;
-            } else {
-                dynamicToggleBtn.innerText = "Rastreio: OFF";
-                dynamicToggleBtn.classList.remove('active');
-                zeroFloorBtn.style.display = 'none';
-                calibratingWarning.style.display = 'none';
-            }
-        }
-
-        function startCalibration() {
-            if (navigator.vibrate) navigator.vibrate(40);
-            isCalibrating = true;
-            calibrationSamples = []; 
-            calibratingWarning.style.display = 'block';
-            zeroFloorBtn.style.opacity = '0.5';
-            setTimeout(finishCalibration, 1000);
-        }
-
-        function finishCalibration() {
-            if (navigator.vibrate) navigator.vibrate([40, 50, 40]); 
-            isCalibrating = false;
-            calibratingWarning.style.display = 'none';
-            zeroFloorBtn.style.opacity = '1';
-            
-            if (calibrationSamples.length > 0) {
-                let sum = calibrationSamples.reduce((a, b) => a + b, 0);
-                sensorBias = sum / calibrationSamples.length;
-            } else {
-                sensorBias = 0;
-            }
-            currentDisplacement = 0; 
-            currentVelocity = 0;
-            updateUIFromDynamicHeight();
-        }
-
+        // --- LÓGICA DO ACELERÔMETRO (AUTO-ALTURA) ---
         function handleMotion(event) {
-            if (!isDynamicHeightOn) return;
+            if (!isTrackingHeight) return;
 
+            // O acceleration fornece a força excluindo a gravidade.
+            // Quando seguramos o celular achatado, o eixo Z aponta para cima.
+            // Quando na vertical, o eixo Y aponta para cima. Vamos usar a magnitude do vetor para captar a elevação.
             const accX = event.acceleration.x || 0;
             const accY = event.acceleration.y || 0;
             const accZ = event.acceleration.z || 0;
             
+            // Calcula a força total do movimento
             let magnitude = Math.sqrt(accX*accX + accY*accY + accZ*accZ);
             
-            // CORREÇÃO DA DIREÇÃO: Se o telemóvel está apontado ao chão, os eixos invertem-se.
-            let direcao = (accY > 0 || accZ > 0) ? 1 : -1;
-            if (INVERTER_MOVIMENTO) direcao *= -1; // Inverte o sinal matematicamente!
+            // Direção do movimento: assumimos que na fase inicial, o movimento é de subida (positivo).
+            // (Numa app comercial como o ARCore, usa-se a câmara para corrigir esta incerteza).
+            let linearAcc = (accY > 0 || accZ > 0) ? magnitude : -magnitude;
 
-            let rawLinearAcc = magnitude * direcao;
-
-            if (isCalibrating) {
-                calibrationSamples.push(rawLinearAcc);
-                return;
-            }
-
-            let pureAcc = rawLinearAcc - sensorBias;
-
-            if (Math.abs(pureAcc) < ACCEL_NOISE_GATE) {
-                pureAcc = 0;
-                currentVelocity *= 0.85; 
+            // Filtro Passa-Alta (Noise Gate) para ignorar tremores do utilizador e evitar "drift" infinito
+            if (Math.abs(linearAcc) < accelNoiseGate) {
+                linearAcc = 0;
+                // Se parou de acelerar, decai a velocidade para zero (evita que o telemóvel ache que continua a flutuar)
+                currentVelocity *= 0.90; 
             }
 
             const currentTime = performance.now();
             if (lastTime !== 0) {
-                let dt = (currentTime - lastTime) / 1000; 
-                if (dt > 0.1) dt = 0.1; 
+                const dt = (currentTime - lastTime) / 1000; // Converte milissegundos para segundos
 
-                currentVelocity += pureAcc * dt;
+                // DUPLA INTEGRAÇÃO
+                // 1. Aceleração altera a Velocidade
+                currentVelocity += linearAcc * dt;
+                
+                // 2. Velocidade altera a Posição (Altura)
                 currentDisplacement += currentVelocity * dt;
 
-                if(currentDisplacement < 0) {
-                    currentDisplacement = 0;
-                    currentVelocity = 0;
-                }
-                updateUIFromDynamicHeight();
+                // Atualiza a tela do utilizador
+                document.getElementById('live-height-display').innerText = currentDisplacement.toFixed(2) + "m";
             }
             lastTime = currentTime;
         }
 
-        function updateUIFromDynamicHeight() {
-            let alturaMatematicaCalculada = currentDisplacement + OFFSET_FISICO;
-            userHeightInput.value = alturaMatematicaCalculada.toFixed(2);
-            updatePhysicalInstruction();
-            updateCalculations();
+        function openAutoHeight() {
+            document.getElementById('auto-height-overlay').style.display = 'flex';
         }
+
+        function startAutoHeight() {
+            const btn = document.getElementById('start-auto-btn');
+            
+            if (!isTrackingHeight) {
+                // Inicia o rastreamento
+                isTrackingHeight = true;
+                currentVelocity = 0;
+                currentDisplacement = 0;
+                lastTime = performance.now();
+                
+                btn.innerText = "Parar e Guardar Altura";
+                btn.style.background = "#ff3b30";
+                document.getElementById('auto-height-instructions').innerText = "A medir... Levanta o telemóvel na vertical!";
+            } else {
+                // Para o rastreamento e guarda o valor
+                isTrackingHeight = false;
+                
+                // Soma o Offset Físico ao deslocamento lido para que a matemática do triângulo bata certo
+                let finalHeight = currentDisplacement + OFFSET_FISICO;
+                if (finalHeight < 0.2) finalHeight = 0.5; // Limite mínimo de segurança
+                
+                userHeightInput.value = finalHeight.toFixed(2);
+                localStorage.setItem('trena_camera_height', finalHeight.toFixed(2));
+                updatePhysicalInstruction();
+                
+                // Reseta a interface
+                btn.innerText = "Iniciar Medição";
+                btn.style.background = "#34c759";
+                document.getElementById('auto-height-instructions').innerText = "1. Coloque o telemóvel no chão...\n2. Clica em 'Iniciar' e levante-o.";
+                document.getElementById('auto-height-overlay').style.display = 'none';
+                
+                updateCalculations();
+            }
+        }
+        // --- FIM DA LÓGICA DO ACELERÔMETRO ---
 
         function handleOrientation(event) {
             if (event.beta !== null) {
@@ -287,13 +315,12 @@
         }
 
         function calibrateHorizon() {
-            if (navigator.vibrate) navigator.vibrate(40);
             horizonBeta = rawPitch; updateCalculations();
         }
 
-        function getBaseDistance() {
-            const h = parseFloat(userHeightInput.value); 
-            const elevation = smoothedPitch - horizonBeta;
+        function getBaseDistance(useRaw = false) {
+            const h = parseFloat(userHeightInput.value);
+            const elevation = (useRaw ? rawPitch : smoothedPitch) - horizonBeta;
             if (!Number.isFinite(h) || h <= 0 || elevation >= -1.5) return null; 
             return -h / Math.tan(elevation * (Math.PI / 180));
         }
@@ -318,23 +345,18 @@
         function updateCalculations() {
             const elevation = smoothedPitch - horizonBeta;
             const hCam = parseFloat(userHeightInput.value) || 1.50; 
-            
             if (currentMode === 'dist') {
-                const d = getBaseDistance();
+                const d = getBaseDistance(false);
                 if (d === null) {
-                    resultDisplay.innerText = "Aponte p/ Baixo"; drawTriangle(0, hCam, 0);
-                    rootStyles.style.setProperty('--crosshair-color', '#ff453a');
+                    resultDisplay.innerText = "Calibre / Mire p/ Baixo"; drawTriangle(0, hCam, 0);
                 } else {
-                    lastCalculatedValue = d;
                     resultDisplay.innerText = `${d.toFixed(2)} m`;
                     drawTriangle(d, hCam, elevation);
-                    rootStyles.style.setProperty('--crosshair-color', '#32d74b');
                 }
             }
         }
 
         function switchMode(mode) {
-            if (navigator.vibrate) navigator.vibrate(40);
             currentMode = mode;
             document.getElementById('btn-mode-dist').classList.toggle('active', mode === 'dist');
             document.getElementById('btn-mode-height').classList.toggle('active', mode === 'height');
@@ -345,12 +367,9 @@
             }
         }
 
-        function saveCurrentMeasurement() {
-            if (navigator.vibrate) navigator.vibrate(40);
-            let hist = JSON.parse(localStorage.getItem('trena_history') || '[]');
-            hist.push({ id: Date.now(), label: "Medida", value: lastCalculatedValue.toFixed(2) });
-            localStorage.setItem('trena_history', JSON.stringify(hist));
-            alert(`Medida de ${lastCalculatedValue.toFixed(2)}m salva!`);
+        function handleAction() {
+            const d = getBaseDistance(true); 
+            if (d !== null) { document.getElementById('action-btn').innerText = "🔄 Resetar Topo"; }
         }
     </script>
 </body>
