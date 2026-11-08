@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trena Virtual Pro - Altura Inercial ZUPT</title>
+    <title>Trena Virtual Pro - Movimento Fluido</title>
     <style>
-        /* ESTILOS BASE */
+        /* ESTILOS BASE E LAYOUT */
         body { margin: 0; padding: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #000; }
         #camera-video { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; object-fit: cover; z-index: 1; }
 
@@ -115,15 +115,15 @@
         let storedDistanceMeters = 0;
         let lastCalculatedValue = 0;
 
-        // --- VARIÁVEIS MELHORADAS DO ZUPT (Zero Velocity Update) ---
+        // --- VARIÁVEIS DO NOVO MOTOR DE AUTO-ALTURA (Janela Deslizante) ---
         let isDynamicHeightOn = false;
         let currentVelocity = 0;
         let currentDisplacement = parseFloat(userHeightInput.value) - OFFSET_FISICO; 
         let lastTime = 0;
         
-        // Aumentámos a barreira de ruído para 0.6 m/s² (ignora tremores menores)
-        const ACCEL_NOISE_GATE = 0.6; 
-        let stillnessFrames = 0; // Contador de frames parados
+        let accelWindow = []; // Guarda as últimas leituras para calcular a média
+        const WINDOW_SIZE = 6; // Quantidade de leituras a suavizar (Resposta super rápida)
+        const ACCEL_NOISE_GATE = 0.12; // Baixámos a barreira para detetar movimentos suaves!
 
         function updatePhysicalInstruction() {
             const calcHeight = parseFloat(userHeightInput.value) || 1.50;
@@ -173,7 +173,7 @@
             }
         }
 
-        // --- LÓGICA DO RASTREIO CONTÍNUO (MELHORADA COM ZUPT) ---
+        // --- NOVO MOTOR DE RASTREIO CONTÍNUO (Fluidez e Resposta Rápida) ---
         function toggleDynamicHeight() {
             if (navigator.vibrate) navigator.vibrate(40);
             isDynamicHeightOn = !isDynamicHeightOn;
@@ -184,7 +184,7 @@
                 zeroFloorBtn.style.display = 'inline-block';
                 lastTime = performance.now();
                 currentVelocity = 0;
-                stillnessFrames = 0;
+                accelWindow = []; // Limpa a memória de movimento
                 currentDisplacement = parseFloat(userHeightInput.value) - OFFSET_FISICO;
                 if(currentDisplacement < 0) currentDisplacement = 0;
             } else {
@@ -198,6 +198,7 @@
             if (navigator.vibrate) navigator.vibrate(40);
             currentDisplacement = 0; 
             currentVelocity = 0;
+            accelWindow = [];
             updateUIFromDynamicHeight();
         }
 
@@ -208,35 +209,35 @@
             const accY = event.acceleration.y || 0;
             const accZ = event.acceleration.z || 0;
             
+            // Força bruta do movimento
             let magnitude = Math.sqrt(accX*accX + accY*accY + accZ*accZ);
-            
-            // Assumimos que a maior aceleração se dá no eixo Y (cima/baixo no ecrã) ou Z (profundidade)
-            let linearAcc = (accY > 0 || accZ > 0) ? magnitude : -magnitude;
+            let rawLinearAcc = (accY > 0 || accZ > 0) ? magnitude : -magnitude;
 
-            // ALGORITMO ZUPT (Zero Velocity Update)
-            if (Math.abs(linearAcc) < ACCEL_NOISE_GATE) {
-                stillnessFrames++;
-                linearAcc = 0;
-                // Se o telemóvel estiver "parado" por 3 frames seguidos, força a velocidade a ZERO absoluto
-                if (stillnessFrames > 3) {
-                    currentVelocity = 0; 
-                } else {
-                    currentVelocity *= 0.5; // Fricção extrema antes de parar
-                }
-            } else {
-                stillnessFrames = 0; // O telemóvel está em movimento forte
+            // 1. FILTRO DE JANELA DESLIZANTE (Suaviza o ruído sem causar atrasos)
+            accelWindow.push(rawLinearAcc);
+            if (accelWindow.length > WINDOW_SIZE) accelWindow.shift();
+            
+            // Calcula a média das últimas leituras
+            let smoothedAcc = accelWindow.reduce((a, b) => a + b, 0) / accelWindow.length;
+
+            // 2. APLICAÇÃO DO NOISE GATE NA ACELERAÇÃO SUAVIZADA
+            if (Math.abs(smoothedAcc) < ACCEL_NOISE_GATE) {
+                smoothedAcc = 0;
+                // Fricção Orgânica: Em vez de parar a zeros, a velocidade cai 15% por frame,
+                // simulando a resistência do ar e parando a mão de forma natural!
+                currentVelocity *= 0.85; 
             }
 
             const currentTime = performance.now();
             if (lastTime !== 0) {
                 let dt = (currentTime - lastTime) / 1000; 
-                // Trava de segurança: Se o browser encravar, não calcula saltos gigantes (máx 0.1s por frame)
-                if (dt > 0.1) dt = 0.1; 
+                if (dt > 0.1) dt = 0.1; // Trava contra engasgos do navegador
 
-                // Integração Rigorosa
-                currentVelocity += linearAcc * dt;
+                // 3. INTEGRAÇÃO FÍSICA
+                currentVelocity += smoothedAcc * dt;
                 currentDisplacement += currentVelocity * dt;
 
+                // Bloqueia a descida abaixo do chão (0 metros)
                 if(currentDisplacement < 0) {
                     currentDisplacement = 0;
                     currentVelocity = 0;
@@ -253,7 +254,6 @@
             updatePhysicalInstruction();
             updateCalculations();
         }
-
         // --- FIM DA LÓGICA DE RASTREIO CONTÍNUO ---
 
         function handleOrientation(event) {
