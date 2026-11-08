@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trena Virtual Pro - Altura Calibrada</title>
+    <title>Trena Virtual Pro - Altura Dinâmica Corrigida</title>
     <style>
         /* ESTILOS BASE E LAYOUT */
         body { margin: 0; padding: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #000; }
@@ -113,24 +113,23 @@
         const calibratingWarning = document.getElementById('calibrating-warning');
         const rootStyles = document.documentElement;
 
-        const OFFSET_FISICO = 0.18; // Desvio da lente validado na prática
+        const OFFSET_FISICO = 0.18;
         let currentMode = 'dist', heightStep = 1;
         let rawPitch = 0, smoothedPitch = null, horizonBeta = 90;
         let storedDistanceMeters = 0;
         let lastCalculatedValue = 0;
 
-        // --- VARIÁVEIS DE CALIBRAÇÃO E RASTREIO CONTÍNUO ---
+        // CONFIGURAÇÃO FÍSICA PARA CORRIGIR A DIREÇÃO DO MOVIMENTO
+        const INVERTER_MOVIMENTO = true; 
+
         let isDynamicHeightOn = false;
         let currentVelocity = 0;
         let currentDisplacement = parseFloat(userHeightInput.value) - OFFSET_FISICO; 
         let lastTime = 0;
         
-        // Sistema de Tara (Bias)
         let isCalibrating = false;
         let calibrationSamples = [];
-        let sensorBias = 0; // O erro de fábrica que vamos descobrir
-        
-        // Barreira muito mais baixa agora que tiramos o erro de fábrica!
+        let sensorBias = 0; 
         const ACCEL_NOISE_GATE = 0.08; 
 
         function updatePhysicalInstruction() {
@@ -181,7 +180,6 @@
             }
         }
 
-        // --- MOTOR DE CALIBRAÇÃO (TARA) E RASTREIO ---
         function toggleDynamicHeight() {
             if (navigator.vibrate) navigator.vibrate(40);
             isDynamicHeightOn = !isDynamicHeightOn;
@@ -202,34 +200,27 @@
             }
         }
 
-        // Inicia a recolha do erro do sensor durante 1 segundo
         function startCalibration() {
             if (navigator.vibrate) navigator.vibrate(40);
             isCalibrating = true;
-            calibrationSamples = []; // Limpa amostras antigas
+            calibrationSamples = []; 
             calibratingWarning.style.display = 'block';
             zeroFloorBtn.style.opacity = '0.5';
-            
-            // Define um alarme para parar a calibração após 1 segundo (1000 milissegundos)
             setTimeout(finishCalibration, 1000);
         }
 
-        // Finaliza a recolha e zera a altura
         function finishCalibration() {
-            if (navigator.vibrate) navigator.vibrate([40, 50, 40]); // Vibração dupla para avisar que terminou
+            if (navigator.vibrate) navigator.vibrate([40, 50, 40]); 
             isCalibrating = false;
             calibratingWarning.style.display = 'none';
             zeroFloorBtn.style.opacity = '1';
             
-            // Calcula a média de todas as leituras de ruído captadas
             if (calibrationSamples.length > 0) {
                 let sum = calibrationSamples.reduce((a, b) => a + b, 0);
                 sensorBias = sum / calibrationSamples.length;
             } else {
                 sensorBias = 0;
             }
-
-            // Agora sim, definimos o telemóvel no chão (Altura = 0) com o sensor limpo!
             currentDisplacement = 0; 
             currentVelocity = 0;
             updateUIFromDynamicHeight();
@@ -243,21 +234,23 @@
             const accZ = event.acceleration.z || 0;
             
             let magnitude = Math.sqrt(accX*accX + accY*accY + accZ*accZ);
-            let rawLinearAcc = (accY > 0 || accZ > 0) ? magnitude : -magnitude;
+            
+            // CORREÇÃO DA DIREÇÃO: Se o telemóvel está apontado ao chão, os eixos invertem-se.
+            let direcao = (accY > 0 || accZ > 0) ? 1 : -1;
+            if (INVERTER_MOVIMENTO) direcao *= -1; // Inverte o sinal matematicamente!
 
-            // Se estivermos na fase de calibração, guardamos o ruído e saímos
+            let rawLinearAcc = magnitude * direcao;
+
             if (isCalibrating) {
                 calibrationSamples.push(rawLinearAcc);
                 return;
             }
 
-            // O SEGREDO MÁGICO: Subtraímos o erro de fábrica à leitura!
             let pureAcc = rawLinearAcc - sensorBias;
 
-            // Filtro de Ruído Baixo (Movimento Fluido)
             if (Math.abs(pureAcc) < ACCEL_NOISE_GATE) {
                 pureAcc = 0;
-                currentVelocity *= 0.85; // Desaceleração suave
+                currentVelocity *= 0.85; 
             }
 
             const currentTime = performance.now();
@@ -265,7 +258,6 @@
                 let dt = (currentTime - lastTime) / 1000; 
                 if (dt > 0.1) dt = 0.1; 
 
-                // Integração
                 currentVelocity += pureAcc * dt;
                 currentDisplacement += currentVelocity * dt;
 
@@ -273,7 +265,6 @@
                     currentDisplacement = 0;
                     currentVelocity = 0;
                 }
-
                 updateUIFromDynamicHeight();
             }
             lastTime = currentTime;
@@ -285,7 +276,6 @@
             updatePhysicalInstruction();
             updateCalculations();
         }
-        // --- FIM DA LÓGICA DE CALIBRAÇÃO E RASTREIO ---
 
         function handleOrientation(event) {
             if (event.beta !== null) {
