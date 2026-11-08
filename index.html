@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trena Virtual Pro - Altura Inteligente</title>
+    <title>Trena Virtual Pro - Offset Calibrado</title>
     <style>
         /* 1. ESTILOS BASE E LAYOUT */
         body {
@@ -71,6 +71,12 @@
             font-size: 11px; color: #ff9f0a; font-weight: bold; margin-top: 2px; display: none;
         }
 
+        /* NOVO: AVISO DE ALTURA FÍSICA */
+        #physical-height-instruction {
+            font-size: 12px; color: #32d74b; font-weight: bold; margin-top: 4px;
+            background: rgba(50, 215, 75, 0.15); padding: 4px; border-radius: 6px;
+        }
+
         .input-group { margin-top: 8px; font-size: 12px; color: #ddd; }
         .input-group input {
             width: 55px; padding: 4px; text-align: center; border-radius: 6px;
@@ -117,7 +123,7 @@
         <span>Visão Lateral</span>
         <svg id="triangle-svg" width="130" height="130">
             <polygon id="triangle-polygon" points="10,10 10,110 110,110" fill="rgba(50, 215, 75, 0.2)" stroke="#32d74b" stroke-width="2"/>
-            <text id="text-h" x="12" y="60" fill="#fff" font-size="11" transform="rotate(-90 12,60)">1.35m</text>
+            <text id="text-h" x="12" y="60" fill="#fff" font-size="11" transform="rotate(-90 12,60)">1.50m</text>
             <text id="text-d" x="60" y="125" fill="#fff" font-size="11" text-anchor="middle">--m</text>
             <text id="text-ang" x="25" y="25" fill="#ff9f0a" font-size="12" font-weight="bold">--°</text>
         </svg>
@@ -135,10 +141,13 @@
         <div id="error-display" style="color: #ff453a; font-size: 11px; margin-top: 2px;"></div>
         
         <div class="input-group">
-            <label for="user-height">Altura Exata da Câmera (m): </label>
-            <!-- O valor default base agora é 1.35 -->
-            <input type="number" id="user-height" value="1.35" step="0.01" min="0.5" max="2.5">
+            <label for="user-height">Altura da Trena (Matemática): </label>
+            <!-- Voltamos ao padrão 1.50m para a matemática do triângulo -->
+            <input type="number" id="user-height" value="1.50" step="0.01" min="0.5" max="2.5">
         </div>
+
+        <!-- NOVO: AVISO DINÂMICO DE ALTURA FÍSICA (OFFSET DE 0.15m) -->
+        <div id="physical-height-instruction">Coloque o celular a 1.35m do chão</div>
 
         <div class="actions-grid">
             <button class="btn-action" id="calibrate-btn" onclick="calibrateHorizon()">🎯 Calibrar</button>
@@ -157,11 +166,13 @@
     <button id="permission-btn">Ativar Trena Virtual</button>
 
     <script>
+        // --- 1. REFERÊNCIAS VISUAIS ---
         const videoElement = document.getElementById('camera-video');
         const resultDisplay = document.getElementById('result-display');
         const subInfo = document.getElementById('sub-info');
         const errorDisplay = document.getElementById('error-display');
         const userHeightInput = document.getElementById('user-height');
+        const physicalInstruction = document.getElementById('physical-height-instruction');
         const permissionBtn = document.getElementById('permission-btn');
         const actionBtn = document.getElementById('action-btn');
         const calibrateBtn = document.getElementById('calibrate-btn');
@@ -171,12 +182,16 @@
         const visualizer = document.getElementById('visualizer-container');
         const rootStyles = document.documentElement;
 
+        // --- 2. VARIÁVEIS DE ESTADO ---
         let currentMode = 'dist';
         let heightStep = 1;
         
         let rawPitch = 0; 
         let smoothedPitch = null;
         const smoothingFactor = 0.25; 
+        
+        // A CONSTANTE DESCOBERTA PELO SEU TESTE FÍSICO
+        const OFFSET_ALTURA = 0.15;
         
         let lastCalculatedValue = 0;
         let horizonBeta = 90;
@@ -185,20 +200,29 @@
         let storedDistanceMeters = 0;
         let savedMeasurements = JSON.parse(localStorage.getItem('trena_history') || '[]');
 
-        // --- NOVA LÓGICA: CARREGAR ALTURA SALVA (SE EXISTIR) ---
+        // --- 3. CARREGAR E SALVAR A ALTURA INTELIGENTE ---
         const savedCameraHeight = localStorage.getItem('trena_camera_height');
         if (savedCameraHeight) {
-            userHeightInput.value = savedCameraHeight; // Recupera o valor salvo (ex: 1.35)
+            userHeightInput.value = savedCameraHeight; 
         }
+        updatePhysicalInstruction(); // Atualiza a tela de instrução no início
 
-        // Salvar a altura sempre que o usuário alterar o input
         userHeightInput.addEventListener('input', () => {
             localStorage.setItem('trena_camera_height', userHeightInput.value);
+            updatePhysicalInstruction();
             updateCalculations();
         });
 
+        // Função que calcula e mostra a altura física onde o usuário deve segurar o celular
+        function updatePhysicalInstruction() {
+            const mathHeight = parseFloat(userHeightInput.value) || 1.50;
+            const physicalHeight = mathHeight - OFFSET_ALTURA;
+            physicalInstruction.innerText = `Segure o celular fisicamente a ${physicalHeight.toFixed(2)}m do chão`;
+        }
+
         function triggerHaptic() { if (navigator.vibrate) navigator.vibrate(40); }
 
+        // --- 4. INICIALIZAÇÃO DE CÂMERA E SENSORES ---
         permissionBtn.addEventListener('click', async () => {
             triggerHaptic();
             errorDisplay.innerText = "";
@@ -237,6 +261,7 @@
             }
         }
 
+        // --- 5. LÓGICA DE GIROSCÓPIO E MATEMÁTICA ---
         function handleOrientation(event) {
             if (event.beta !== null) {
                 rawPitch = event.beta;
@@ -261,14 +286,14 @@
         }
 
         function getBaseDistance(useRaw = false) {
-            const h = parseFloat(userHeightInput.value);
+            const h = parseFloat(userHeightInput.value); // Usa os 1.50m na matemática
             const elevation = getElevationDegrees(useRaw);
             if (!Number.isFinite(h) || h <= 0 || elevation >= -1.5) return null; 
             return -h / Math.tan(elevation * (Math.PI / 180));
         }
 
         function getObjectHeight() {
-            const h = parseFloat(userHeightInput.value);
+            const h = parseFloat(userHeightInput.value); // Usa os 1.50m na matemática
             const currentElev = getElevationDegrees(false); 
             if (!Number.isFinite(h) || h <= 0) return 0;
             const heightFromHorizon = storedDistanceMeters * Math.tan(currentElev * (Math.PI / 180));
@@ -280,6 +305,7 @@
             rootStyles.style.setProperty('--crosshair-color', isValid ? '#32d74b' : '#ff453a');
         }
 
+        // --- 6. ATUALIZAÇÃO DA INTERFACE E ANIMAÇÃO ---
         function drawTriangle(distance, cameraHeight, angle) {
             if (!distance || distance <= 0) {
                 visualizer.style.opacity = '0.3'; return;
@@ -312,7 +338,7 @@
 
         function updateCalculations() {
             const elevation = getElevationDegrees(false);
-            const hCam = parseFloat(userHeightInput.value) || 1.35; // Default de segurança 1.35
+            const hCam = parseFloat(userHeightInput.value) || 1.50;
 
             if (currentMode === 'dist') {
                 const d = getBaseDistance(false);
@@ -341,6 +367,7 @@
             }
         }
 
+        // --- 7. HISTÓRICO ---
         function toggleHistory() {
             triggerHaptic();
             const isHidden = historySection.style.display === 'none' || historySection.style.display === '';
@@ -391,6 +418,7 @@
             }
         }
 
+        // --- 8. GERENCIADOR DE MODOS ---
         function switchMode(mode) {
             triggerHaptic();
             currentMode = mode;
@@ -408,7 +436,7 @@
         }
 
         function resetHeightState() {
-            const hCam = parseFloat(userHeightInput.value) || 1.35;
+            const hCam = parseFloat(userHeightInput.value) || 1.50;
             heightStep = 1;
             storedDistanceMeters = 0;
             actionBtn.style.display = 'inline-block';
