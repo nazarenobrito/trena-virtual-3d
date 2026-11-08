@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trena Virtual Pro - Movimento Fluido</title>
+    <title>Trena Virtual Pro - Altura Calibrada</title>
     <style>
         /* ESTILOS BASE E LAYOUT */
         body { margin: 0; padding: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #000; }
@@ -32,6 +32,9 @@
         .dynamic-btn { background: #8e8e93; color: white; border: none; border-radius: 6px; padding: 5px 10px; font-size: 11px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
         .dynamic-btn.active { background: #ff3b30; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+
+        /* AVISO DE CALIBRAÇÃO */
+        #calibrating-warning { display: none; margin-top: 8px; font-size: 12px; color: #32d74b; font-weight: bold; background: rgba(50, 215, 75, 0.2); padding: 6px; border-radius: 6px; }
 
         .actions-grid { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
         .btn-action { padding: 8px 12px; font-size: 12px; font-weight: bold; color: #fff; border: none; border-radius: 12px; cursor: pointer; }
@@ -70,15 +73,15 @@
 
         <div id="result-display" class="result-title">Calibre o Nível</div>
         <div id="sub-info" style="font-size: 11px; color: #aaa;">Olhe para frente e calibre</div>
-        <div id="error-display" style="color: #ff453a; font-size: 11px; margin-top: 2px;"></div>
         
         <div class="input-group">
             <label for="user-height">Altura Calc (m): </label>
             <input type="number" id="user-height" value="1.50" step="0.01" min="0.0" max="5.0">
-            <!-- BOTÕES DA ALTURA DINÂMICA -->
             <button id="dynamic-toggle-btn" class="dynamic-btn" onclick="toggleDynamicHeight()">Rastreio: OFF</button>
-            <button id="zero-floor-btn" class="dynamic-btn" style="background:#34c759; display:none;" onclick="zeroFloor()">📍 Zerar Chão</button>
+            <button id="zero-floor-btn" class="dynamic-btn" style="background:#34c759; display:none;" onclick="startCalibration()">📍 Zerar Chão</button>
         </div>
+
+        <div id="calibrating-warning">A calibrar sensor... NÃO MOVA O TELEMÓVEL!</div>
 
         <div style="margin-top: 6px; font-size: 12px; color: #ffcc00;">
             Câmera física a: <strong id="real-height-val">1.32</strong><strong>m</strong>
@@ -107,23 +110,28 @@
         const permissionBtn = document.getElementById('permission-btn');
         const dynamicToggleBtn = document.getElementById('dynamic-toggle-btn');
         const zeroFloorBtn = document.getElementById('zero-floor-btn');
+        const calibratingWarning = document.getElementById('calibrating-warning');
         const rootStyles = document.documentElement;
 
-        const OFFSET_FISICO = 0.18; // Desvio da lente validado
+        const OFFSET_FISICO = 0.18; // Desvio da lente validado na prática
         let currentMode = 'dist', heightStep = 1;
         let rawPitch = 0, smoothedPitch = null, horizonBeta = 90;
         let storedDistanceMeters = 0;
         let lastCalculatedValue = 0;
 
-        // --- VARIÁVEIS DO NOVO MOTOR DE AUTO-ALTURA (Janela Deslizante) ---
+        // --- VARIÁVEIS DE CALIBRAÇÃO E RASTREIO CONTÍNUO ---
         let isDynamicHeightOn = false;
         let currentVelocity = 0;
         let currentDisplacement = parseFloat(userHeightInput.value) - OFFSET_FISICO; 
         let lastTime = 0;
         
-        let accelWindow = []; // Guarda as últimas leituras para calcular a média
-        const WINDOW_SIZE = 6; // Quantidade de leituras a suavizar (Resposta super rápida)
-        const ACCEL_NOISE_GATE = 0.12; // Baixámos a barreira para detetar movimentos suaves!
+        // Sistema de Tara (Bias)
+        let isCalibrating = false;
+        let calibrationSamples = [];
+        let sensorBias = 0; // O erro de fábrica que vamos descobrir
+        
+        // Barreira muito mais baixa agora que tiramos o erro de fábrica!
+        const ACCEL_NOISE_GATE = 0.08; 
 
         function updatePhysicalInstruction() {
             const calcHeight = parseFloat(userHeightInput.value) || 1.50;
@@ -173,7 +181,7 @@
             }
         }
 
-        // --- NOVO MOTOR DE RASTREIO CONTÍNUO (Fluidez e Resposta Rápida) ---
+        // --- MOTOR DE CALIBRAÇÃO (TARA) E RASTREIO ---
         function toggleDynamicHeight() {
             if (navigator.vibrate) navigator.vibrate(40);
             isDynamicHeightOn = !isDynamicHeightOn;
@@ -184,21 +192,46 @@
                 zeroFloorBtn.style.display = 'inline-block';
                 lastTime = performance.now();
                 currentVelocity = 0;
-                accelWindow = []; // Limpa a memória de movimento
                 currentDisplacement = parseFloat(userHeightInput.value) - OFFSET_FISICO;
                 if(currentDisplacement < 0) currentDisplacement = 0;
             } else {
                 dynamicToggleBtn.innerText = "Rastreio: OFF";
                 dynamicToggleBtn.classList.remove('active');
                 zeroFloorBtn.style.display = 'none';
+                calibratingWarning.style.display = 'none';
             }
         }
 
-        function zeroFloor() {
+        // Inicia a recolha do erro do sensor durante 1 segundo
+        function startCalibration() {
             if (navigator.vibrate) navigator.vibrate(40);
+            isCalibrating = true;
+            calibrationSamples = []; // Limpa amostras antigas
+            calibratingWarning.style.display = 'block';
+            zeroFloorBtn.style.opacity = '0.5';
+            
+            // Define um alarme para parar a calibração após 1 segundo (1000 milissegundos)
+            setTimeout(finishCalibration, 1000);
+        }
+
+        // Finaliza a recolha e zera a altura
+        function finishCalibration() {
+            if (navigator.vibrate) navigator.vibrate([40, 50, 40]); // Vibração dupla para avisar que terminou
+            isCalibrating = false;
+            calibratingWarning.style.display = 'none';
+            zeroFloorBtn.style.opacity = '1';
+            
+            // Calcula a média de todas as leituras de ruído captadas
+            if (calibrationSamples.length > 0) {
+                let sum = calibrationSamples.reduce((a, b) => a + b, 0);
+                sensorBias = sum / calibrationSamples.length;
+            } else {
+                sensorBias = 0;
+            }
+
+            // Agora sim, definimos o telemóvel no chão (Altura = 0) com o sensor limpo!
             currentDisplacement = 0; 
             currentVelocity = 0;
-            accelWindow = [];
             updateUIFromDynamicHeight();
         }
 
@@ -209,35 +242,33 @@
             const accY = event.acceleration.y || 0;
             const accZ = event.acceleration.z || 0;
             
-            // Força bruta do movimento
             let magnitude = Math.sqrt(accX*accX + accY*accY + accZ*accZ);
             let rawLinearAcc = (accY > 0 || accZ > 0) ? magnitude : -magnitude;
 
-            // 1. FILTRO DE JANELA DESLIZANTE (Suaviza o ruído sem causar atrasos)
-            accelWindow.push(rawLinearAcc);
-            if (accelWindow.length > WINDOW_SIZE) accelWindow.shift();
-            
-            // Calcula a média das últimas leituras
-            let smoothedAcc = accelWindow.reduce((a, b) => a + b, 0) / accelWindow.length;
+            // Se estivermos na fase de calibração, guardamos o ruído e saímos
+            if (isCalibrating) {
+                calibrationSamples.push(rawLinearAcc);
+                return;
+            }
 
-            // 2. APLICAÇÃO DO NOISE GATE NA ACELERAÇÃO SUAVIZADA
-            if (Math.abs(smoothedAcc) < ACCEL_NOISE_GATE) {
-                smoothedAcc = 0;
-                // Fricção Orgânica: Em vez de parar a zeros, a velocidade cai 15% por frame,
-                // simulando a resistência do ar e parando a mão de forma natural!
-                currentVelocity *= 0.85; 
+            // O SEGREDO MÁGICO: Subtraímos o erro de fábrica à leitura!
+            let pureAcc = rawLinearAcc - sensorBias;
+
+            // Filtro de Ruído Baixo (Movimento Fluido)
+            if (Math.abs(pureAcc) < ACCEL_NOISE_GATE) {
+                pureAcc = 0;
+                currentVelocity *= 0.85; // Desaceleração suave
             }
 
             const currentTime = performance.now();
             if (lastTime !== 0) {
                 let dt = (currentTime - lastTime) / 1000; 
-                if (dt > 0.1) dt = 0.1; // Trava contra engasgos do navegador
+                if (dt > 0.1) dt = 0.1; 
 
-                // 3. INTEGRAÇÃO FÍSICA
-                currentVelocity += smoothedAcc * dt;
+                // Integração
+                currentVelocity += pureAcc * dt;
                 currentDisplacement += currentVelocity * dt;
 
-                // Bloqueia a descida abaixo do chão (0 metros)
                 if(currentDisplacement < 0) {
                     currentDisplacement = 0;
                     currentVelocity = 0;
@@ -254,7 +285,7 @@
             updatePhysicalInstruction();
             updateCalculations();
         }
-        // --- FIM DA LÓGICA DE RASTREIO CONTÍNUO ---
+        // --- FIM DA LÓGICA DE CALIBRAÇÃO E RASTREIO ---
 
         function handleOrientation(event) {
             if (event.beta !== null) {
