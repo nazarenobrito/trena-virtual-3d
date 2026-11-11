@@ -77,15 +77,15 @@
             border: 1px solid #555; background: rgba(0,0,0,0.5); color: #fff; font-weight: bold;
         }
 
-        /* ESTILO PARA A INSTRUÇÃO DA ALTURA FÍSICA */
-        #physical-instruction {
+        /* ESTILO PARA A INSTRUÇÃO DA ALTURA CALCULADA */
+        #calculation-instruction {
             margin-top: 6px;
             font-size: 13px;
-            color: #ffcc00;
-            background: rgba(255, 204, 0, 0.15);
+            color: #32d74b;
+            background: rgba(50, 215, 75, 0.15);
             padding: 6px;
             border-radius: 8px;
-            border: 1px solid rgba(255, 204, 0, 0.3);
+            border: 1px solid rgba(50, 215, 75, 0.3);
         }
 
         .actions-grid { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
@@ -146,14 +146,14 @@
         <div id="error-display" style="color: #ff453a; font-size: 11px; margin-top: 2px;"></div>
         
         <div class="input-group">
-            <label for="user-height">Altura no Cálculo (m): </label>
-            <!-- Valor default matemático 1.50 -->
-            <input type="number" id="user-height" value="1.50" step="0.01" min="0.5" max="2.5">
+            <label for="user-height">Altura Real do Celular (m): </label>
+            <!-- Valor default real físico 1.32 -->
+            <input type="number" id="user-height" value="1.32" step="0.01" min="0.5" max="2.5">
         </div>
         
-        <!-- NOVA INSTRUÇÃO VISUAL DA ALTURA REAL -->
-        <div id="physical-instruction">
-            Segure o celular a exatos: <strong id="real-height-val">1.32</strong><strong>m</strong> do chão
+        <!-- NOVA INSTRUÇÃO MOSTRANDO O VALOR COM OFFSET PARA O CÁLCULO -->
+        <div id="calculation-instruction">
+            Altura no Triângulo (Cálculo): <strong id="calc-height-val">1.50</strong><strong>m</strong>
         </div>
 
         <div class="actions-grid">
@@ -187,7 +187,7 @@
         const visualizer = document.getElementById('visualizer-container');
         const rootStyles = document.documentElement;
 
-        // CONSTANTE DE DESVIO FÍSICO QUE DESCOBRISTE (1.50 - 1.32 = 0.18)
+        // OFFSET FÍSICO: Diferença entre a câmera e o pivô (ex: 1.50 câmera - 1.32 pivô = 0.18)
         const OFFSET_FISICO = 0.18;
 
         let currentMode = 'dist';
@@ -204,25 +204,30 @@
         let storedDistanceMeters = 0;
         let savedMeasurements = JSON.parse(localStorage.getItem('trena_history') || '[]');
 
-        // --- ATUALIZA A INSTRUÇÃO VISUAL (ALTURA REAL) ---
-        function updatePhysicalInstruction() {
-            const calcHeight = parseFloat(userHeightInput.value) || 1.50;
-            let realHeight = calcHeight - OFFSET_FISICO;
-            if (realHeight < 0) realHeight = 0;
-            document.getElementById('real-height-val').innerText = realHeight.toFixed(2);
+        // --- FUNÇÃO PARA OBTER A ALTURA MATEMÁTICA (Real + Offset) ---
+        // Pega a altura digitada e soma o offset da lente da câmera
+        function getCalculatedHeight() {
+            const realHeight = parseFloat(userHeightInput.value) || 1.32;
+            return realHeight + OFFSET_FISICO;
         }
 
-        // --- CARREGAR ALTURA MATEMÁTICA SALVA ---
-        const savedCameraHeight = localStorage.getItem('trena_camera_height');
-        if (savedCameraHeight) {
-            userHeightInput.value = savedCameraHeight; 
+        // --- ATUALIZA A INSTRUÇÃO VISUAL (ALTURA DE CÁLCULO) ---
+        function updateCalculationInstruction() {
+            const calcHeight = getCalculatedHeight();
+            document.getElementById('calc-height-val').innerText = calcHeight.toFixed(2);
         }
-        updatePhysicalInstruction(); // Atualiza a label logo que a página carrega
 
-        // Salvar a altura sempre que o usuário alterar o input
+        // --- CARREGAR ALTURA REAL SALVA ---
+        const savedRealHeight = localStorage.getItem('trena_real_height');
+        if (savedRealHeight) {
+            userHeightInput.value = savedRealHeight; 
+        }
+        updateCalculationInstruction(); // Atualiza a label de cálculo logo que a página carrega
+
+        // Salvar a altura sempre que o usuário alterar o input e atualizar cálculos
         userHeightInput.addEventListener('input', () => {
-            localStorage.setItem('trena_camera_height', userHeightInput.value);
-            updatePhysicalInstruction();
+            localStorage.setItem('trena_real_height', userHeightInput.value);
+            updateCalculationInstruction();
             updateCalculations();
         });
 
@@ -290,16 +295,16 @@
         }
 
         function getBaseDistance(useRaw = false) {
-            // A MATEMÁTICA CONTINUA A USAR A ALTURA CONFIGURADA NO INPUT
-            const h = parseFloat(userHeightInput.value);
+            // Usa a altura de cálculo que já tem o offset somado
+            const h = getCalculatedHeight();
             const elevation = getElevationDegrees(useRaw);
             if (!Number.isFinite(h) || h <= 0 || elevation >= -1.5) return null; 
             return -h / Math.tan(elevation * (Math.PI / 180));
         }
 
         function getObjectHeight() {
-            // A MATEMÁTICA CONTINUA A USAR A ALTURA CONFIGURADA NO INPUT
-            const h = parseFloat(userHeightInput.value);
+            // Usa a altura de cálculo que já tem o offset somado
+            const h = getCalculatedHeight();
             const currentElev = getElevationDegrees(false); 
             if (!Number.isFinite(h) || h <= 0) return 0;
             const heightFromHorizon = storedDistanceMeters * Math.tan(currentElev * (Math.PI / 180));
@@ -343,7 +348,8 @@
 
         function updateCalculations() {
             const elevation = getElevationDegrees(false);
-            const hCam = parseFloat(userHeightInput.value) || 1.50; 
+            // Atualizamos o desenho e as lógicas para usarem a altura com offset
+            const hCam = getCalculatedHeight(); 
 
             if (currentMode === 'dist') {
                 const d = getBaseDistance(false);
@@ -439,7 +445,7 @@
         }
 
         function resetHeightState() {
-            const hCam = parseFloat(userHeightInput.value) || 1.50;
+            const hCam = getCalculatedHeight();
             heightStep = 1;
             storedDistanceMeters = 0;
             actionBtn.style.display = 'inline-block';
